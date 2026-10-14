@@ -1,0 +1,1023 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="BonBon, Split Bill Calculator: bagi tagihan makan bareng. Rincian per orang, rekening tujuan, dan checklist siapa yang sudah bayar.">
+<meta name="theme-color" content="#0F7B5F">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230F7B5F'/%3E%3Ctext x='16' y='23' font-size='20' text-anchor='middle' fill='white' font-family='monospace' font-weight='700'%3E%C3%B7%3C/text%3E%3C/svg%3E">
+<title>BonBon · Split Bill Calculator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap">
+<style>
+/* Layout: one narrow app column, sticky step bar, thermal-receipt image as the payoff */
+:root{
+  --bg:#EEF2F0; --surface:#FFFFFF; --sunk:#F5F8F6; --ink:#14201C; --muted:#5B6964; --line:#D6DEDA;
+  --accent:#0F7B5F; --accent-ink:#FFFFFF; --accent-soft:#DFF0EA;
+  --warn:#9A520A; --warn-soft:#FBEFD9; --danger:#B3261E;
+  --sans:"Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono:"JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --r:12px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0E1412; --surface:#17201C; --sunk:#121a17; --ink:#E6EEEA; --muted:#97A6A0; --line:#2A3631;
+  --accent:#43C49A; --accent-ink:#05231A; --accent-soft:#15342A;
+  --warn:#EBA75C; --warn-soft:#3A2A14; --danger:#F2B8B5; color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#0E1412; --surface:#17201C; --sunk:#121a17; --ink:#E6EEEA; --muted:#97A6A0; --line:#2A3631;
+  --accent:#43C49A; --accent-ink:#05231A; --accent-soft:#15342A;
+  --warn:#EBA75C; --warn-soft:#3A2A14; --danger:#F2B8B5; color-scheme:dark;
+}
+*{box-sizing:border-box}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0}
+img{max-width:100%}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.app{max-width:640px;margin:0 auto;padding-inline:16px;padding-block:0 48px}
+button,input,textarea{font:inherit;color:inherit}
+input,textarea{font-size:16px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-block:18px 10px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:19px;letter-spacing:-.01em}
+.bname{display:flex;flex-direction:column;line-height:1.15}
+.bname small{font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.02em}
+.logo{width:30px;height:30px;border-radius:8px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-family:var(--mono);font-weight:700;font-size:15px}
+
+.steps{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);display:grid;grid-template-columns:repeat(5,1fr);gap:4px;padding-block:8px 12px}
+.steps button{border:0;background:none;padding:6px 2px 0;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--muted);font-size:12px;font-weight:600;min-width:0}
+.steps button::before{content:"";display:block;width:100%;height:4px;border-radius:4px;background:var(--line)}
+.steps button.done::before{background:var(--accent-soft)}
+.steps button.on{color:var(--ink)}
+.steps button.on::before{background:var(--accent)}
+.steps.hidden-nav{display:none}
+
+.banner{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;background:var(--warn-soft);color:var(--warn);border-radius:10px;padding:10px 14px;font-size:13.5px;font-weight:500;margin-block:4px 8px}
+.banner button{border:0;background:none;color:inherit;text-decoration:underline;font-weight:700;cursor:pointer;padding:0}
+
+section{display:flex;flex-direction:column;gap:16px;padding-block:8px}
+h1{font-size:26px;line-height:1.15;font-weight:800;letter-spacing:-.02em;margin:0;text-wrap:balance}
+h2{font-size:17px;font-weight:700;margin:8px 0 0}
+.lede{margin:-8px 0 0;color:var(--muted);max-width:60ch}
+.note{margin:0;color:var(--muted);font-size:13.5px}
+.status{margin:0;font-size:13.5px;color:var(--muted);min-height:1.2em}
+.status.err{color:var(--danger)}
+.status.ok{color:var(--accent)}
+
+.primary,.ghost,.danger{border-radius:10px;padding:11px 16px;font-weight:700;cursor:pointer;border:1px solid transparent;font-size:15px}
+.primary{background:var(--accent);color:var(--accent-ink)}
+.primary:disabled{opacity:.45;cursor:not-allowed}
+.ghost{background:var(--surface);border-color:var(--line)}
+.ghost:hover{border-color:var(--accent)}
+.danger{background:none;color:var(--danger);border-color:var(--line)}
+.link{border:0;background:none;color:var(--accent);font-weight:600;cursor:pointer;padding:0;font-size:13.5px;align-self:flex-start}
+.navrow{display:flex;gap:10px;justify-content:space-between;flex-wrap:wrap;margin-top:8px}
+.navrow .primary{flex:1 1 auto}
+
+.upload{display:grid;grid-template-columns:120px 1fr;gap:14px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px}
+.drop{width:120px;height:150px;border:1.5px dashed var(--line);border-radius:10px;display:grid;place-items:center;text-align:center;font-size:12.5px;color:var(--muted);cursor:pointer;overflow:hidden;padding:8px;background:var(--sunk)}
+.drop:hover{border-color:var(--accent);color:var(--accent)}
+.drop img{width:100%;height:100%;object-fit:cover;border-radius:6px}
+.upload .side{display:flex;flex-direction:column;gap:8px;min-width:0}
+.upload .side p{margin:0}
+
+.field{display:flex;flex-direction:column;gap:6px;min-width:0}
+.field>span{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.inp{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-width:0}
+.inp:focus{border-color:var(--accent);outline:none}
+
+.items{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.ihead,.irow{display:grid;grid-template-columns:minmax(0,1fr) 52px 104px 34px;gap:8px;align-items:center;padding:8px 10px}
+.ihead{font-size:11.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;background:var(--sunk);border-bottom:1px solid var(--line)}
+.irow+.irow{border-top:1px solid var(--line)}
+.irow input{border:1px solid transparent;background:transparent;border-radius:8px;padding:7px 8px;width:100%;min-width:0}
+.irow input:hover{border-color:var(--line)}
+.irow input:focus{border-color:var(--accent);background:var(--surface);outline:none}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right}
+.x{border:0;background:none;color:var(--muted);font-size:20px;line-height:1;cursor:pointer;width:34px;height:34px;border-radius:8px}
+.x:hover{background:var(--sunk);color:var(--danger)}
+.empty-items{padding:18px;color:var(--muted);font-size:14px;text-align:center}
+
+.extras{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.extras .inp{font-family:var(--mono);text-align:right}
+.totals{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;display:flex;flex-direction:column;gap:4px;font-size:14px}
+.trow{display:flex;justify-content:space-between;gap:12px}
+.trow span:last-child{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.trow.big{font-weight:800;font-size:16px;border-top:1px dashed var(--line);padding-top:8px;margin-top:4px}
+.check{font-size:13px;margin-top:4px}
+.check.ok{color:var(--accent)} .check.bad{color:var(--warn)}
+
+.addrow{display:flex;gap:8px}
+.addrow .inp{flex:1}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:inline-flex;align-items:center;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:5px 6px 5px 14px;font-weight:600}
+.chip button{border:0;background:none;color:var(--muted);cursor:pointer;font-size:17px;width:26px;height:26px;border-radius:50%;line-height:1}
+.chip button:hover{background:var(--sunk);color:var(--danger)}
+
+.acards{display:flex;flex-direction:column;gap:10px}
+.acard{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.acard.unset{border-color:var(--warn);box-shadow:inset 3px 0 0 var(--warn)}
+.ahead{display:flex;gap:10px;align-items:baseline}
+.aname{font-weight:700;flex:1;min-width:0;overflow-wrap:anywhere}
+.aqty{color:var(--muted);font-family:var(--mono);font-size:13px}
+.aprice{font-family:var(--mono);font-weight:600;font-variant-numeric:tabular-nums}
+.pills{display:flex;flex-wrap:wrap;gap:6px}
+.pill{position:relative;display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:14px;font-weight:600;cursor:pointer;user-select:none;background:var(--surface)}
+.pill input{position:absolute;opacity:0;pointer-events:none}
+.pill.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.pill:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:2px}
+.pill.all{background:var(--accent-soft);color:var(--accent);border:1.5px solid var(--accent);font-weight:800;letter-spacing:.01em}
+.pill.all::before{content:"✓✓";font-size:11px;margin-right:6px;letter-spacing:-2px}
+.pill.all.on{background:var(--accent);color:var(--accent-ink)}
+.pills .sep{width:1px;align-self:stretch;background:var(--line);margin-inline:2px}
+.afoot{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+.afoot b{color:var(--ink);font-family:var(--mono);font-weight:600}
+.ptag{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--accent);background:var(--accent-soft);border-radius:6px;padding:1px 7px;margin-left:6px;white-space:nowrap}
+.acard.part{border-left:3px solid var(--accent)}
+.mconf{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center;color:var(--warn);font-size:13px;max-width:100%}
+.flag{background:var(--warn-soft);color:var(--warn);border-radius:10px;padding:10px 14px;font-size:14px;font-weight:500}
+
+.accs{display:flex;flex-direction:column;gap:8px}
+.payee-who{display:flex;flex-direction:column;gap:6px}
+.payee-who:empty{display:none}
+.payee-who .note.warn{color:var(--warn)}
+.acc{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;cursor:pointer;text-align:left;width:100%}
+.acc.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.radio{width:18px;height:18px;border-radius:50%;border:2px solid var(--line);flex:none}
+.acc.on .radio{border-color:var(--accent);background:radial-gradient(var(--accent) 45%,transparent 50%)}
+.acc .who{flex:1;min-width:0}
+.acc .who b{display:block}
+.acc .who span{font-family:var(--mono);font-size:13.5px;color:var(--muted);overflow-wrap:anywhere}
+.acc .del{flex:none}
+.form{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;gap:12px}
+.form .grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
+.cb{display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer}
+.cb input{width:18px;height:18px;accent-color:var(--accent)}
+
+.shot{margin:0;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px;display:flex;justify-content:center}
+.shot img{width:100%;max-width:420px;height:auto;border-radius:6px}
+.actions{display:flex;flex-wrap:wrap;gap:8px}
+.actions>*{flex:1 1 160px}
+.paid{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.prow{display:flex;align-items:center;gap:12px;padding:12px 14px;cursor:pointer}
+.prow+.prow{border-top:1px solid var(--line)}
+.prow input{width:20px;height:20px;accent-color:var(--accent);flex:none}
+.prow .pn{flex:1;font-weight:600;min-width:0;overflow-wrap:anywhere}
+.prow .pa{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.tag{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border-radius:6px;padding:2px 7px}
+.tag.paid{background:var(--accent-soft);color:var(--accent)}
+.tag.due{background:var(--warn-soft);color:var(--warn)}
+.tag.host{background:var(--sunk);color:var(--muted)}
+.prog{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.prog b{font-family:var(--mono)}
+textarea.inp{min-height:140px;font-family:var(--mono);font-size:13px}
+
+.hlist{display:flex;flex-direction:column;gap:8px}
+.hitem{display:flex;gap:12px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px}
+.hitem .open{flex:1;min-width:0;border:0;background:none;text-align:left;cursor:pointer;padding:0;display:flex;flex-direction:column;gap:2px}
+.hitem .open b{overflow-wrap:anywhere}
+.hitem .open span{font-size:13px;color:var(--muted)}
+.hempty{padding:24px;text-align:center;color:var(--muted);background:var(--surface);border:1px dashed var(--line);border-radius:var(--r)}
+
+@media (max-width:440px){
+  h1{font-size:23px}
+  .upload{grid-template-columns:96px 1fr}
+  .drop{width:96px;height:124px}
+  .ihead,.irow{grid-template-columns:minmax(0,1fr) 40px 88px 30px;gap:4px;padding:6px 8px}
+  .irow input{padding:7px 4px}
+  .extras{grid-template-columns:1fr 1fr 1fr;gap:6px}
+  .form .grid2{grid-template-columns:1fr}
+  .steps button{font-size:11px}
+}
+@media (prefers-reduced-motion:no-preference){.pill,.acc,.ghost{transition:background .12s,border-color .12s,color .12s}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="bar">
+    <div class="brand"><span class="logo" aria-hidden="true">÷</span><span class="bname"><span>BonBon</span><small>Split Bill Calculator</small></span></div>
+    <button class="ghost" id="btnHistory" data-act="history">Riwayat</button>
+  </header>
+
+  <nav class="steps" id="steps" aria-label="Langkah"></nav>
+  <div class="banner" id="exampleBanner" hidden>Ini contoh isian. Ganti dengan foto struk Anda, atau <button data-act="reset">mulai dari kosong</button></div>
+
+  <main>
+    <!-- 1. Struk -->
+    <section id="s0" data-step="0">
+      <h1>Foto struk</h1>
+      <p class="lede">Unggah foto struk, menu dan harganya akan dibaca otomatis. Periksa hasilnya sebelum lanjut.</p>
+      <div class="upload" id="uploadBox">
+        <label for="file" class="drop"><img id="thumb" alt="Foto struk" hidden><span id="dropText">Pilih atau ambil foto struk</span></label>
+        <input id="file" type="file" accept="image/*" hidden>
+        <div class="side">
+          <button class="primary" id="btnScan" data-act="scan" disabled>Baca struk</button>
+          <p class="status" id="scanStatus" role="status"></p>
+        </div>
+      </div>
+      <p class="note" id="noScan" hidden>Pembacaan foto otomatis tidak tersedia di tampilan ini. Isi menu secara manual di bawah.</p>
+      <label class="field"><span>Nama tempat</span><input class="inp" id="title" placeholder="mis. Warung Bu Sri" autocomplete="off"></label>
+      <div class="items" id="items"></div>
+      <button class="link" data-act="addItem">+ Tambah menu</button>
+      <div class="extras">
+        <label class="field"><span>Pajak</span><input class="inp" id="tax" inputmode="numeric" placeholder="0"></label>
+        <label class="field"><span>Service</span><input class="inp" id="service" inputmode="numeric" placeholder="0"></label>
+        <label class="field"><span>Diskon</span><input class="inp" id="discount" inputmode="numeric" placeholder="0"></label>
+      </div>
+      <label class="field"><span>Total di struk (opsional, untuk cek)</span><input class="inp" id="receiptTotal" inputmode="numeric" placeholder="mis. 196.900" style="font-family:var(--mono);text-align:right"></label>
+      <div class="totals" id="totals"></div>
+      <div class="navrow"><button class="primary" data-act="go" data-to="1">Lanjut: siapa yang makan</button></div>
+    </section>
+
+    <!-- 2. Peserta -->
+    <section id="s1" data-step="1" hidden>
+      <h1>Siapa yang makan?</h1>
+      <p class="lede">Ketik nama lalu tekan Tambah. Bisa juga tempel beberapa nama dipisah koma.</p>
+      <div class="addrow"><input class="inp" id="personInput" placeholder="Nama" autocomplete="off"><button class="primary" data-act="addPerson">Tambah</button></div>
+      <div class="chips" id="people"></div>
+      <div class="navrow"><button class="ghost" data-act="go" data-to="0">Kembali</button><button class="primary" data-act="go" data-to="2">Lanjut: siapa pesan apa</button></div>
+    </section>
+
+    <!-- 3. Menu -->
+    <section id="s2" data-step="2" hidden>
+      <h1>Siapa pesan apa?</h1>
+      <p class="lede">Pilih nama untuk tiap menu. Kalau dipilih lebih dari satu orang, harganya dibagi rata.</p>
+      <div id="assignFlag"></div>
+      <div class="acards" id="assign"></div>
+      <div class="navrow"><button class="ghost" data-act="go" data-to="1">Kembali</button><button class="primary" data-act="go" data-to="3">Lanjut: bayar ke siapa</button></div>
+    </section>
+
+    <!-- 4. Rekening -->
+    <section id="s3" data-step="3" hidden>
+      <h1>Bayar ke siapa?</h1>
+      <p class="lede" id="accLede">Pilih rekening penerima, atau tambahkan yang baru.</p>
+      <div class="accs" id="accList"></div>
+      <div class="payee-who" id="payeeWho"></div>
+      <form class="form" id="accForm" novalidate>
+        <div class="grid2">
+          <label class="field"><span>Nama pemilik</span><input class="inp" id="accOwner" placeholder="mis. Andi" autocomplete="off"></label>
+          <label class="field"><span>Bank / e-wallet</span><input class="inp" id="accBank" placeholder="mis. BCA, GoPay" autocomplete="off"></label>
+        </div>
+        <label class="field"><span>Nomor rekening / HP</span><input class="inp" id="accNumber" inputmode="numeric" placeholder="mis. 1234567890" autocomplete="off"></label>
+        <label class="cb" id="accSaveWrap"><input type="checkbox" id="accSave" checked> Simpan untuk split berikutnya</label>
+        <button class="ghost" type="submit">Pakai rekening ini</button>
+        <p class="status" id="accStatus" role="status"></p>
+      </form>
+      <div class="navrow"><button class="ghost" data-act="go" data-to="2">Kembali</button><button class="primary" data-act="go" data-to="4">Lihat hasil</button></div>
+    </section>
+
+    <!-- 5. Hasil -->
+    <section id="s4" data-step="4" hidden>
+      <h1>Hasil</h1>
+      <div id="resultFlags"></div>
+      <figure class="shot"><img id="resultImg" alt="Ringkasan split bill per orang"></figure>
+      <div class="actions">
+        <button class="primary" id="btnSaveImg" data-act="saveImg">Simpan gambar</button>
+        <button class="ghost" data-act="copyText">Salin sebagai teks</button>
+      </div>
+      <p class="note" id="imgHint"></p>
+      <div class="prog"><h2>Status pembayaran</h2><b id="paidCount"></b></div>
+      <div class="paid" id="paidList"></div>
+      <button class="ghost" data-act="copyReminder">Salin pesan tagihan untuk yang belum bayar</button>
+      <p class="status" id="copyStatus" role="status"></p>
+      <textarea class="inp" id="copyFallback" readonly hidden aria-label="Teks untuk disalin"></textarea>
+      <p class="status" id="saveStatus" role="status"></p>
+      <div class="navrow"><button class="ghost" data-act="go" data-to="3">Kembali</button><button class="ghost" data-act="newBill">Split baru</button></div>
+    </section>
+
+    <!-- Riwayat -->
+    <section id="sH" hidden>
+      <h1>Riwayat</h1>
+      <p class="lede" id="histNote"></p>
+      <div class="hlist" id="histList"></div>
+      <div class="navrow"><button class="ghost" data-act="go" data-to="0">Kembali ke split</button><button class="primary" data-act="newBill">Split baru</button></div>
+    </section>
+  </main>
+</div>
+
+<script>
+(function(){
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const num = v => { const d = String(v ?? "").replace(/[^\d]/g, ""); return d ? Math.min(parseInt(d, 10), 999999999999) : 0; };
+const fmtN = n => Math.round(n).toLocaleString("id-ID");
+const fmt = n => (n < 0 ? "-Rp" : "Rp") + fmtN(Math.abs(n));
+const rid = () => Math.random().toString(36).slice(2, 9);
+const norm = s => String(s || "").trim().toLowerCase();
+const STEPS = ["Struk", "Peserta", "Menu", "Rekening", "Hasil"];
+const LS = "bonbon.v1.";
+
+/* ---------- state ---------- */
+function blank(){ return { billId:null, title:"", date:new Date().toISOString(), items:[], tax:0, service:0, discount:0, scannedTotal:null, people:[], payee:null, payeePerson:null, paid:{}, isExample:false }; }
+function example(){
+  const s = blank();
+  s.isExample = true; s.title = "Warung Sate Pak Kumis (contoh)";
+  s.people = ["Andi", "Budi", "Citra"];
+  s.items = [
+    { id:rid(), name:"Sate Ayam 10 tusuk", qty:2, price:70000, who:["Andi","Budi"] },
+    { id:rid(), name:"Nasi Putih", qty:3, price:18000, who:["Andi","Budi","Citra"] },
+    { id:rid(), name:"Sop Buntut", qty:1, price:55000, who:["Citra"] },
+    { id:rid(), name:"Es Teh Manis", qty:3, price:24000, who:["Andi","Budi","Citra"] },
+    { id:rid(), name:"Kerupuk Kulit", qty:1, price:12000, who:["Andi","Budi","Citra"] }
+  ];
+  s.tax = 17900; s.service = 0; s.discount = 0; s.scannedTotal = 196900;
+  s.payee = { id:"contoh", owner:"Andi", bank:"BCA", number:"1234567890" };
+  return s;
+}
+let state = (() => { const d = lsGet("draft"); return d && Array.isArray(d.items) ? Object.assign(blank(), d) : example(); })();
+let step = 0, view = "steps";
+let accounts = [];
+let db = null, uid = null, sample = null, downloads = null, imgLimits = null;
+let storeMode = "local"; // "account" when db + uid works
+// Baca struk otomatis dimatikan untuk versi ini. Untuk mengaktifkan lagi: set ke true dan tambahkan api/scan.js.
+const SCAN_ENABLED = false;
+let standalone = false, serverScan = false; // standalone = running outside Claude (e.g. Vercel)
+const canScan = () => !!scanFile && (!!sample || serverScan);
+let scanFile = null, lastSavedJSON = null, resultBlob = null;
+
+function lsGet(k){ try { return JSON.parse(localStorage.getItem(LS + k)); } catch(e){ return null; } }
+function lsSet(k, v){ try { localStorage.setItem(LS + k, JSON.stringify(v)); } catch(e){} }
+let draftT = null;
+function touch(fromUser){
+  if (fromUser && state.isExample){ state.isExample = false; $("#exampleBanner").hidden = true; }
+  clearTimeout(draftT); draftT = setTimeout(() => lsSet("draft", state), 400);
+}
+
+/* ---------- write queue (one write at a time per doc) ---------- */
+const queues = {};
+function enqueue(key, fn){ const p = (queues[key] || Promise.resolve()).then(fn); queues[key] = p.catch(() => {}); return p; }
+function dropToLocal(e){
+  if (e && (e.code === "invalid_argument" || e.code === "revoked" || e.code === "not_granted")){ db = null; storeMode = "local"; renderStoreNotes(); return true; }
+  return false;
+}
+
+/* ---------- accounts (saved payees) ---------- */
+function profileRef(){ return db.doc("data/users/" + uid + "/profile"); }
+async function loadAccounts(){
+  if (storeMode === "account"){
+    try { const s = await profileRef().get(); accounts = (s.exists && Array.isArray(s.data().accounts)) ? s.data().accounts.slice() : []; return; }
+    catch(e){ dropToLocal(e); }
+  }
+  accounts = lsGet("accounts") || [];
+}
+function persistAccounts(){
+  const copy = JSON.parse(JSON.stringify(accounts));
+  lsSet("accounts", copy);
+  if (storeMode !== "account") return Promise.resolve();
+  return enqueue("profile", () => profileRef().set({ accounts: copy })).catch(e => { if (!dropToLocal(e)) $("#accStatus").textContent = "Rekening belum tersimpan ke akun. Coba lagi nanti."; });
+}
+
+/* ---------- bills (history + paid status) ---------- */
+function billsCol(){ return profileRef().collection("bills"); }
+function billBody(){
+  const c = calc();
+  return { title: state.title || "Tanpa nama", date: state.date, items: state.items, tax: state.tax, service: state.service, discount: state.discount,
+    scannedTotal: state.scannedTotal, people: state.people, payee: state.payee, payeePerson: state.payeePerson, paid: state.paid, grand: Math.round(c.grand),
+    createdAt: state.createdAt || Date.now(), updatedAt: Date.now() };
+}
+function saveBill(){
+  if (state.isExample || !state.people.length || !state.items.length) { $("#saveStatus").textContent = state.isExample ? "Contoh tidak disimpan ke riwayat." : ""; return; }
+  if (!state.billId){ state.billId = "b" + Date.now().toString(36) + rid(); state.createdAt = Date.now(); }
+  const body = billBody();
+  const sig = JSON.stringify(Object.assign({}, body, { updatedAt:0 }));
+  if (sig === lastSavedJSON) return;
+  lastSavedJSON = sig;
+  const id = state.billId;
+  // local copy always
+  const list = (lsGet("bills") || []).filter(b => b.id !== id);
+  list.unshift(Object.assign({ id }, body)); lsSet("bills", list.slice(0, 60));
+  touch(false);
+  if (storeMode !== "account"){ $("#saveStatus").textContent = "Tersimpan di riwayat browser ini."; return; }
+  $("#saveStatus").textContent = "Menyimpan…";
+  enqueue("bill:" + id, () => billsCol().doc(id).set(body))
+    .then(() => { $("#saveStatus").className = "status ok"; $("#saveStatus").textContent = "Tersimpan di riwayat akun Anda."; })
+    .catch(e => { lastSavedJSON = null; if (!dropToLocal(e)) { $("#saveStatus").className = "status err"; $("#saveStatus").textContent = "Gagal menyimpan ke akun. Status tetap tersimpan di browser ini."; } });
+}
+async function loadBills(){
+  if (storeMode === "account"){
+    try { const s = await billsCol().orderBy("createdAt", "desc").limit(100).get(); return s.docs.map(d => Object.assign({ id:d.id }, d.data())); }
+    catch(e){ dropToLocal(e); }
+  }
+  return lsGet("bills") || [];
+}
+async function deleteBill(id){
+  lsSet("bills", (lsGet("bills") || []).filter(b => b.id !== id));
+  if (storeMode === "account"){ try { await enqueue("bill:" + id, () => billsCol().doc(id).delete()); } catch(e){ dropToLocal(e); } }
+  if (state.billId === id){ state.billId = null; lastSavedJSON = null; }
+}
+
+/* ---------- math ---------- */
+function calc(){
+  const per = {}; state.people.forEach(p => per[p] = { items:[], sub:0 });
+  const unassigned = []; let itemsTotal = 0;
+  state.items.forEach(it => {
+    itemsTotal += it.price;
+    const who = (it.who || []).filter(w => per[w]);
+    if (!who.length){ unassigned.push(it); return; }
+    const share = it.price / who.length;
+    who.forEach(w => {
+      per[w].sub += share;
+      if (it.grp){
+        // portions of one split item: show as one line per person, e.g. "Es Teh (2 dari 5)"
+        const key = it.grp + "|" + who.length;
+        const ex = per[w].items.find(x => x.key === key);
+        if (ex){ ex.cnt++; ex.share += share; ex.name = `${it.name} (${ex.cnt} dari ${it.of})`; return; }
+        per[w].items.push({ key, cnt:1, name:`${it.name} (1 dari ${it.of})`, qty:1, share, n:who.length });
+        return;
+      }
+      per[w].items.push({ name:it.name, qty:it.qty, share, n:who.length });
+    });
+  });
+  const extra = state.tax + state.service - state.discount;
+  const n = state.people.length;
+  const ex = n ? extra / n : 0;
+  state.people.forEach(p => { per[p].extra = ex; per[p].total = Math.round(per[p].sub + ex); });
+  return { per, unassigned, itemsTotal, extra, ex, grand: itemsTotal + extra };
+}
+function payeeName(st){
+  st = st || state;
+  if (!st.payee || st.payeePerson === "__none__") return null;
+  const ppl = st.people || [];
+  if (st.payeePerson && ppl.includes(st.payeePerson)) return st.payeePerson;
+  return ppl.find(p => norm(p) === norm(st.payee.owner)) || null;
+}
+const isPayee = p => !!p && payeeName() === p;
+
+/* ---------- render ---------- */
+function show(){
+  document.querySelectorAll("main section").forEach(s => s.hidden = true);
+  $("#steps").classList.toggle("hidden-nav", view !== "steps");
+  if (view === "history"){ $("#sH").hidden = false; renderHistory(); return; }
+  $("#s" + step).hidden = false;
+  $("#steps").innerHTML = STEPS.map((t, i) => `<button data-act="go" data-to="${i}" class="${i === step ? "on" : i < step ? "done" : ""}" ${i === step ? 'aria-current="step"' : ""}>${i + 1}. ${t}</button>`).join("");
+  $("#exampleBanner").hidden = !state.isExample;
+  [renderStruk, renderPeople, renderAssign, renderAccounts, renderResult][step]();
+  window.scrollTo({ top:0 });
+}
+
+function renderStruk(){
+  $("#title").value = state.title;
+  ["tax","service","discount"].forEach(k => $("#" + k).value = state[k] ? fmtN(state[k]) : "");
+  $("#receiptTotal").value = state.scannedTotal ? fmtN(state.scannedTotal) : "";
+  const rows = state.items.map(it => `
+    <div class="irow" data-id="${it.id}">
+      <input id="n-${it.id}" data-f="name" value="${esc(it.name)}" placeholder="Nama menu" aria-label="Nama menu">
+      <input id="q-${it.id}" data-f="qty" class="num" inputmode="numeric" value="${it.qty}" aria-label="Jumlah">
+      <input id="p-${it.id}" data-f="price" class="num" inputmode="numeric" value="${it.price ? fmtN(it.price) : ""}" placeholder="0" aria-label="Harga total">
+      <button class="x" data-act="delItem" aria-label="Hapus ${esc(it.name)}">×</button>
+    </div>`).join("");
+  $("#items").innerHTML = `<div class="ihead"><span>Menu</span><span class="num">Qty</span><span class="num">Harga</span><span></span></div>` +
+    (rows || `<div class="empty-items">Belum ada menu. Tekan "+ Tambah menu" di bawah.</div>`);
+  renderTotals();
+}
+function renderTotals(){
+  const c = calc();
+  let h = `<div class="trow"><span>Subtotal menu</span><span>${fmt(c.itemsTotal)}</span></div>`;
+  if (state.tax) h += `<div class="trow"><span>Pajak</span><span>${fmt(state.tax)}</span></div>`;
+  if (state.service) h += `<div class="trow"><span>Service</span><span>${fmt(state.service)}</span></div>`;
+  if (state.discount) h += `<div class="trow"><span>Diskon</span><span>${fmt(-state.discount)}</span></div>`;
+  h += `<div class="trow big"><span>Total</span><span>${fmt(c.grand)}</span></div>`;
+  if (state.scannedTotal){
+    const d = Math.round(c.grand - state.scannedTotal);
+    h += d === 0 ? `<div class="check ok">Cocok dengan total di struk (${fmt(state.scannedTotal)}).</div>`
+                 : `<div class="check bad">Total di struk ${fmt(state.scannedTotal)}, selisih ${fmt(d)}. Cek lagi menu atau pajaknya.</div>`;
+  }
+  $("#totals").innerHTML = h;
+}
+
+function renderPeople(){
+  $("#people").innerHTML = state.people.length
+    ? state.people.map((p, i) => `<span class="chip">${esc(p)}<button data-act="delPerson" data-i="${i}" aria-label="Hapus ${esc(p)}">×</button></span>`).join("")
+    : `<p class="note">Belum ada nama.</p>`;
+  setTimeout(() => $("#personInput").focus(), 0);
+}
+
+function renderAssign(){
+  if (!state.people.length){ $("#assignFlag").innerHTML = `<div class="flag">Tambahkan nama dulu di langkah Peserta.</div>`; $("#assign").innerHTML = ""; return; }
+  const c = calc();
+  $("#assignFlag").innerHTML = c.unassigned.length ? `<div class="flag">${c.unassigned.length} menu belum ada pemiliknya.</div>` : "";
+  $("#assign").innerHTML = state.items.map((it, i) => {
+    const who = (it.who || []).filter(w => state.people.includes(w));
+    const all = who.length === state.people.length;
+    const pills = state.people.map((p, pi) => {
+      const on = who.includes(p);
+      return `<label class="pill ${on ? "on" : ""}"><input type="checkbox" id="w-${it.id}-${pi}" data-act="who" data-i="${i}" data-pi="${pi}" ${on ? "checked" : ""}>${esc(p)}</label>`;
+    }).join("");
+    const firstG = it.grp && state.items.findIndex(x => x.grp === it.grp) === i;
+    let ctl = "";
+    if (firstG){
+      ctl = pendingMerge === it.grp
+        ? `<span class="mconf">Porsi ini dimiliki orang berbeda. Kalau digabung, harganya dibagi rata ke semuanya. <button class="link" data-act="mergeConfirm" data-g="${it.grp}">Tetap gabung</button><button class="link" data-act="cancelMerge">Batal</button></span>`
+        : `<button class="link" data-act="merge" data-g="${it.grp}">Gabungkan lagi ${state.items.filter(x => x.grp === it.grp).length} porsi</button>`;
+    } else if (!it.grp && it.qty > 1){
+      ctl = `<button class="link" data-act="splitQty" data-i="${i}">Pecah jadi ${it.qty} porsi</button>`;
+    }
+    return `<div class="acard ${who.length ? "" : "unset"} ${it.grp ? "part" : ""}">
+      <div class="ahead"><span class="aname">${esc(it.name || "Tanpa nama")}${it.grp ? `<span class="ptag">porsi ${it.part}/${it.of}</span>` : ""}</span>${it.grp ? "" : `<span class="aqty">×${it.qty}</span>`}<span class="aprice">${fmt(it.price)}</span></div>
+      <div class="pills"><button class="pill all ${all ? "on" : ""}" data-act="all" data-i="${i}" aria-pressed="${all}">Semua</button><span class="sep" aria-hidden="true"></span>${pills}</div>
+      <div class="afoot"><span>${who.length > 1 ? `Dibagi ${who.length}: <b>${fmt(it.price / who.length)}</b> per orang` : who.length ? "" : "Belum dipilih"}</span>
+      ${ctl}</div>
+    </div>`;
+  }).join("") || `<p class="note">Belum ada menu.</p>`;
+}
+
+function renderStoreNotes(){
+  const acct = storeMode === "account";
+  $("#accLede").textContent = acct ? "Pilih rekening penerima. Rekening yang disimpan ada di akun Anda dan hanya bisa dilihat oleh Anda."
+                                   : standalone ? "Pilih rekening penerima. Rekening yang disimpan ada di browser ini saja dan tidak dikirim ke server."
+                                   : "Pilih rekening penerima. Rekening disimpan di browser ini saja. Buka halaman ini saat masuk ke Claude agar tersimpan di akun.";
+  $("#histNote").textContent = acct ? "Split yang pernah dibuat, tersimpan di akun Anda. Buka untuk melihat atau memperbarui status bayar."
+                                    : standalone ? "Split yang pernah dibuat, tersimpan di browser ini. Buka untuk melihat atau memperbarui status bayar."
+                                    : "Split yang pernah dibuat, tersimpan di browser ini. Masuk ke Claude agar riwayat tersimpan di akun.";
+}
+let pendingDel = null, pendingMerge = null;
+function renderAccounts(){
+  renderStoreNotes();
+  const list = accounts.slice();
+  if (state.payee && !list.some(a => a.id === state.payee.id)) list.unshift(state.payee);
+  $("#accList").innerHTML = list.map(a => {
+    const on = state.payee && state.payee.id === a.id;
+    const saved = accounts.some(x => x.id === a.id);
+    const del = saved ? (pendingDel === a.id
+        ? `<button class="danger del" data-act="delAcc" data-id="${esc(a.id)}">Yakin hapus?</button>`
+        : `<button class="link del" data-act="askDelAcc" data-id="${esc(a.id)}">Hapus</button>`) : "";
+    return `<div class="acc ${on ? "on" : ""}" data-act="pickAcc" data-id="${esc(a.id)}" role="radio" aria-checked="${on}" tabindex="0">
+      <span class="radio"></span><span class="who"><b>${esc(a.owner)}</b><span>${esc(a.bank)} · ${esc(a.number)}</span></span>${del}</div>`;
+  }).join("") || `<p class="note">Belum ada rekening tersimpan.</p>`;
+  renderPayeeWho();
+}
+function renderPayeeWho(){
+  const box = $("#payeeWho");
+  if (!state.payee || !state.people.length){ box.innerHTML = ""; return; }
+  const cur = payeeName(), auto = state.payeePerson == null;
+  const opts = state.people.map(p => `<option value="${esc(p)}" ${cur === p ? "selected" : ""}>${esc(p)}</option>`).join("")
+    + `<option value="__none__" ${cur === null ? "selected" : ""}>Bukan peserta (tidak ikut makan)</option>`;
+  let note, warn = false;
+  if (cur) note = `${esc(cur)} ditandai sebagai penerima dan tidak ditagih.` + (auto ? " Dipilih otomatis karena namanya sama dengan pemilik rekening." : "");
+  else if (auto){ note = `Nama pemilik rekening (${esc(state.payee.owner)}) tidak ada di daftar peserta. Kalau pemiliknya ikut makan, pilih namanya di sini supaya tidak ikut ditagih.`; warn = true; }
+  else note = "Semua peserta akan ditagih.";
+  box.innerHTML = `<label class="field"><span>Penerima transfer di daftar peserta</span><select class="inp" id="payeePerson">${opts}</select></label><p class="note ${warn ? "warn" : ""}">${note}</p>`;
+}
+
+async function renderResult(){
+  const c = calc();
+  const flags = [];
+  if (!state.people.length) flags.push("Belum ada peserta.");
+  if (c.unassigned.length) flags.push(`${c.unassigned.length} menu belum ada pemiliknya, jadi belum dihitung: ${c.unassigned.map(i => esc(i.name)).join(", ")}.`);
+  if (!state.payee) flags.push("Rekening penerima belum dipilih.");
+  $("#resultFlags").innerHTML = flags.map(f => `<div class="flag">${f}</div>`).join("");
+  renderPaid(c);
+  await drawResult(c);
+  saveBill();
+}
+function renderPaid(c){
+  c = c || calc();
+  const debtors = state.people.filter(p => !isPayee(p));
+  const paidN = debtors.filter(p => state.paid[p]).length;
+  $("#paidCount").textContent = debtors.length ? `${paidN}/${debtors.length} lunas` : "";
+  $("#paidList").innerHTML = state.people.map((p, i) => {
+    if (isPayee(p)) return `<div class="prow"><span class="pn">${esc(p)}</span><span class="tag host">Penerima</span><span class="pa">${fmt(c.per[p].total)}</span></div>`;
+    const on = !!state.paid[p];
+    return `<label class="prow"><input type="checkbox" id="paid-${i}" data-act="paid" data-pi="${i}" ${on ? "checked" : ""}>
+      <span class="pn">${esc(p)}</span><span class="tag ${on ? "paid" : "due"}">${on ? "Lunas" : "Belum"}</span><span class="pa">${fmt(c.per[p].total)}</span></label>`;
+  }).join("") || `<p class="note" style="padding:14px">Belum ada peserta.</p>`;
+}
+
+/* ---------- receipt image (canvas) ---------- */
+const MONO = '"JetBrains Mono", ui-monospace, Menlo, monospace', SANS = '"Plus Jakarta Sans", system-ui, sans-serif';
+function fit(ctx, s, w){ s = String(s); if (ctx.measureText(s).width <= w) return s; while (s.length > 1 && ctx.measureText(s + "…").width > w) s = s.slice(0, -1); return s + "…"; }
+function paint(ctx, c){
+  const W = 720, M = 28, X1 = M + 36, X2 = W - M - 36, IW = X2 - X1;
+  const dateStr = new Date(state.date).toLocaleDateString("id-ID", { day:"numeric", month:"long", year:"numeric" });
+  const ink = "#16211D", soft = "#5E6B66", green = "#0F7B5F";
+  let y = M + 58;
+  const ops = [];
+  const T = (txt, x, yy, font, color, align) => ops.push(() => { ctx.font = font; ctx.fillStyle = color; ctx.textAlign = align || "left"; ctx.fillText(txt, x, yy); });
+  const dash = (yy, pat) => ops.push(() => { ctx.save(); ctx.strokeStyle = "#B9C4BF"; ctx.lineWidth = 2; ctx.setLineDash(pat || [8, 8]); ctx.beginPath(); ctx.moveTo(X1, yy); ctx.lineTo(X2, yy); ctx.stroke(); ctx.restore(); });
+
+  T("SPLIT BILL", X1, y, `700 19px ${MONO}`, green);
+  T(dateStr, X2, y, `400 19px ${MONO}`, soft, "right");
+  y += 50;
+  ctx.font = `800 36px ${SANS}`;
+  const title = state.title || "Patungan";
+  const words = title.split(/\s+/); let line = "", lines = [];
+  words.forEach(w => { const t = line ? line + " " + w : w; if (ctx.measureText(t).width > IW && line){ lines.push(line); line = w; } else line = t; });
+  if (line) lines.push(line); lines = lines.slice(0, 3);
+  lines.forEach(l => { T(l, X1, y, `800 36px ${SANS}`, ink); y += 44; });
+  T(`${state.people.length} orang · ${state.items.length} menu`, X1, y, `500 19px ${SANS}`, soft);
+  y += 30; dash(y); y += 52;
+
+  state.people.forEach(p => {
+    const d = c.per[p];
+    ctx.font = `700 28px ${SANS}`;
+    const nameW = IW - 230;
+    const nm = fit(ctx, p, nameW);
+    T(nm, X1, y, `700 28px ${SANS}`, ink);
+    const nmW = ctx.measureText(nm).width;
+    T(fmt(d.total), X2, y, `700 28px ${MONO}`, ink, "right");
+    if (isPayee(p)) badge(X1 + nmW + 12, y, "PENERIMA", "#E6ECEA", soft);
+    else if (state.paid[p]) badge(X1 + nmW + 12, y, "LUNAS", "#DFF0EA", green);
+    y += 36;
+    ctx.font = `400 20px ${MONO}`;
+    d.items.forEach(it => {
+      const right = fmt(it.share);
+      const label = it.n > 1 ? `${it.name} (÷${it.n})` : (it.qty > 1 ? `${it.name} ×${it.qty}` : it.name);
+      ctx.font = `400 20px ${MONO}`;
+      T(fit(ctx, label, IW - 170), X1 + 18, y, `400 20px ${MONO}`, soft);
+      T(right, X2, y, `400 20px ${MONO}`, soft, "right");
+      y += 30;
+    });
+    if (Math.round(d.extra) !== 0){
+      const parts = [state.tax ? "pajak" : "", state.service ? "service" : "", state.discount ? "diskon" : ""].filter(Boolean).join("+");
+      T(`${parts || "biaya lain"} (÷${state.people.length})`, X1 + 18, y, `400 20px ${MONO}`, soft);
+      T(fmt(d.extra), X2, y, `400 20px ${MONO}`, soft, "right");
+      y += 30;
+    }
+    y += 10; dash(y, [3, 7]); y += 46;
+  });
+
+  y -= 8;
+  T("TOTAL", X1, y, `700 22px ${MONO}`, ink);
+  T(fmt(c.grand), X2, y, `700 30px ${MONO}`, ink, "right");
+  y += 24;
+  if (c.unassigned.length){ y += 14; T(`${c.unassigned.length} menu belum dibagi`, X1, y, `600 18px ${SANS}`, "#9A520A"); y += 10; }
+  y += 22;
+
+  if (state.payee){
+    const top = y, h = 172;
+    ops.push(() => { ctx.fillStyle = "#E4F2EC"; roundRect(ctx, X1 - 4, top, IW + 8, h, 14); ctx.fill(); });
+    T("TRANSFER KE", X1 + 20, top + 38, `700 17px ${MONO}`, green);
+    ctx.font = `700 22px ${SANS}`;
+    T(fit(ctx, state.payee.bank, IW - 40), X1 + 20, top + 72, `700 22px ${SANS}`, ink);
+    ctx.font = `700 34px ${MONO}`;
+    T(fit(ctx, state.payee.number, IW - 40), X1 + 20, top + 116, `700 34px ${MONO}`, ink);
+    ctx.font = `500 20px ${SANS}`;
+    T(fit(ctx, "a.n. " + state.payee.owner, IW - 40), X1 + 20, top + 150, `500 20px ${SANS}`, soft);
+    y = top + h + 34;
+  }
+  T("dihitung dengan BonBon · Split Bill Calculator", W / 2, y, `400 16px ${MONO}`, "#97A39E", "center");
+  y += 40;
+  const H = y + M;
+
+  function badge(x, yy, txt, bg, fg){
+    ops.push(() => { ctx.font = `700 14px ${MONO}`; const w = ctx.measureText(txt).width + 16; ctx.fillStyle = bg; roundRect(ctx, x, yy - 22, w, 26, 6); ctx.fill(); ctx.fillStyle = fg; ctx.textAlign = "left"; ctx.fillText(txt, x + 8, yy - 3); });
+  }
+  return { W, H, M, ops };
+}
+function roundRect(ctx, x, y, w, h, r){ ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+async function drawResult(c){
+  try { await Promise.all([document.fonts.load(`700 28px ${MONO}`), document.fonts.load(`400 20px ${MONO}`), document.fonts.load(`800 36px ${SANS}`), document.fonts.load(`700 28px ${SANS}`), document.fonts.load(`500 20px ${SANS}`)]); } catch(e){}
+  const scratch = document.createElement("canvas").getContext("2d");
+  const L = paint(scratch, c);
+  const S = 2, cv = document.createElement("canvas");
+  cv.width = L.W * S; cv.height = L.H * S;
+  const ctx = cv.getContext("2d"); ctx.scale(S, S);
+  // background + paper with zigzag edges
+  ctx.fillStyle = "#E3E9E6"; ctx.fillRect(0, 0, L.W, L.H);
+  const x0 = L.M, x1 = L.W - L.M, y0 = L.M, y1 = L.H - L.M, z = 10;
+  ctx.beginPath(); ctx.moveTo(x0, y0 + z);
+  for (let x = x0; x < x1; x += z * 2){ ctx.lineTo(Math.min(x + z, x1), y0); ctx.lineTo(Math.min(x + z * 2, x1), y0 + z); }
+  ctx.lineTo(x1, y1 - z);
+  for (let x = x1; x > x0; x -= z * 2){ ctx.lineTo(Math.max(x - z, x0), y1); ctx.lineTo(Math.max(x - z * 2, x0), y1 - z); }
+  ctx.closePath(); ctx.fillStyle = "#FFFFFF"; ctx.fill();
+  const L2 = paint(ctx, c);
+  ctx.textBaseline = "alphabetic";
+  L2.ops.forEach(f => f());
+  resultBlob = await new Promise(r => cv.toBlob(r, "image/png"));
+  const img = $("#resultImg");
+  if (img.dataset.url) URL.revokeObjectURL(img.dataset.url);
+  const url = resultBlob ? URL.createObjectURL(resultBlob) : cv.toDataURL("image/png");
+  img.dataset.url = resultBlob ? url : ""; img.src = url;
+  $("#btnSaveImg").hidden = !downloads && !standalone;
+  if (standalone) $("#btnSaveImg").textContent = canShareFiles() ? "Bagikan / simpan gambar" : "Simpan gambar";
+  $("#imgHint").textContent = (downloads || standalone) ? "Atau tekan lama gambar untuk menyimpan, lalu kirim ke grup." : "Tekan lama (atau klik kanan) gambar untuk menyimpan, lalu kirim ke grup.";
+}
+
+/* ---------- text outputs ---------- */
+function payeeLine(){ return state.payee ? `Transfer ke ${state.payee.bank} ${state.payee.number} a.n. ${state.payee.owner}` : ""; }
+function summaryText(){
+  const c = calc();
+  const head = `*Split bill: ${state.title || "Patungan"}*\n`;
+  const body = state.people.map(p => {
+    const d = c.per[p];
+    const lines = d.items.map(it => `  - ${it.name}${it.n > 1 ? ` (÷${it.n})` : ""}: ${fmt(it.share)}`);
+    if (Math.round(d.extra)) lines.push(`  - Pajak/service (÷${state.people.length}): ${fmt(d.extra)}`);
+    return `*${p}: ${fmt(d.total)}*${isPayee(p) ? " (penerima)" : state.paid[p] ? " ✓ lunas" : ""}\n` + lines.join("\n");
+  }).join("\n\n");
+  return head + "\n" + body + `\n\nTotal: ${fmt(c.grand)}` + (state.payee ? "\n" + payeeLine() : "");
+}
+function reminderText(){
+  const c = calc();
+  const due = state.people.filter(p => !isPayee(p) && !state.paid[p]);
+  if (!due.length) return null;
+  return `Halo! Pengingat patungan *${state.title || "makan bareng"}* yang belum dibayar:\n` +
+    due.map(p => `- ${p}: ${fmt(c.per[p].total)}`).join("\n") + (state.payee ? `\n\n${payeeLine()}` : "") + "\nTerima kasih!";
+}
+function copy(text, okMsg){
+  const st = $("#copyStatus"), ta = $("#copyFallback");
+  const fallback = () => { ta.hidden = false; ta.value = text; ta.focus(); ta.select(); st.className = "status"; st.textContent = "Salin teks di bawah ini secara manual."; };
+  try {
+    navigator.clipboard.writeText(text).then(() => { ta.hidden = true; st.className = "status ok"; st.textContent = okMsg; }, fallback);
+  } catch(e){ fallback(); }
+}
+
+/* ---------- history ---------- */
+let histDel = null;
+async function renderHistory(){
+  renderStoreNotes();
+  $("#histList").innerHTML = `<p class="note">Memuat…</p>`;
+  const bills = await loadBills();
+  if (!bills.length){ $("#histList").innerHTML = `<div class="hempty">Belum ada riwayat. Split yang sampai ke langkah Hasil akan tersimpan di sini.</div>`; return; }
+  $("#histList").innerHTML = bills.map(b => {
+    const ppl = b.people || [];
+    const pn = payeeName(b);
+    const debt = ppl.filter(p => p !== pn);
+    const paidN = debt.filter(p => b.paid && b.paid[p]).length;
+    const d = new Date(b.date || b.createdAt).toLocaleDateString("id-ID", { day:"numeric", month:"short", year:"numeric" });
+    const done = debt.length && paidN === debt.length;
+    return `<div class="hitem"><button class="open" data-act="openBill" data-id="${esc(b.id)}"><b>${esc(b.title)}</b><span>${d} · ${fmt(b.grand || 0)} · ${ppl.length} orang</span></button>
+      <span class="tag ${done ? "paid" : "due"}">${paidN}/${debt.length} lunas</span>
+      ${histDel === b.id ? `<button class="danger" data-act="delBill" data-id="${esc(b.id)}">Hapus?</button>` : `<button class="x" data-act="askDelBill" data-id="${esc(b.id)}" aria-label="Hapus">×</button>`}</div>`;
+  }).join("");
+  renderHistory.cache = bills;
+}
+
+/* ---------- scan ---------- */
+const PROMPT = `Foto ini adalah struk/nota restoran atau toko di Indonesia. Ekstrak isinya sebagai SATU objek JSON saja, tanpa teks lain, dengan bentuk:
+{"merchant": string atau null, "items": [{"name": string, "qty": number, "price": number}], "tax": number, "service": number, "discount": number, "total": number atau null}
+Aturan:
+- "price" adalah total harga baris itu (qty × harga satuan) dalam rupiah, angka bulat.
+- Pada angka Indonesia, titik adalah pemisah ribuan (35.000 = 35000), koma untuk desimal.
+- "tax" = pajak (PB1, PPN, Tax). "service" = service charge. "discount" = total potongan/promo sebagai angka positif. Isi 0 jika tidak ada.
+- Jangan masukkan baris subtotal, total, tunai, kembalian, atau pembayaran sebagai item.
+- Jika ada modifier/topping dengan harga sendiri, jadikan item terpisah; jika tanpa harga, gabungkan ke nama item.
+- "total" = total akhir yang harus dibayar menurut struk.`;
+async function shrink(file){
+  try {
+    const bmp = await createImageBitmap(file);
+    const k = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
+    const okType = /^image\/(jpeg|png|webp)$/.test(file.type);
+    if (k === 1 && okType && (!imgLimits || file.size <= imgLimits.maxInputBytes)) return file;
+    const cv = document.createElement("canvas"); cv.width = Math.round(bmp.width * k); cv.height = Math.round(bmp.height * k);
+    cv.getContext("2d").drawImage(bmp, 0, 0, cv.width, cv.height);
+    return await new Promise(r => cv.toBlob(b => r(b || file), "image/jpeg", 0.86));
+  } catch(e){ return file; }
+}
+async function scan(){
+  if (!canScan()) return;
+  const st = $("#scanStatus"), btn = $("#btnScan");
+  btn.disabled = true; st.className = "status"; st.textContent = "Membaca struk…";
+  try {
+    const blob = await shrink(scanFile);
+    const r = sample ? await sample.json(PROMPT, { images:[blob], modelTier:"default" }) : await scanViaServer(blob);
+    const items = (r && Array.isArray(r.items) ? r.items : []).filter(x => x && x.name).map(x => ({
+      id:rid(), name:String(x.name).slice(0, 80), qty:Math.max(1, Math.round(+x.qty || 1)), price:Math.max(0, Math.round(+x.price || 0)), who:[] }));
+    if (!items.length) throw { code:"no_items" };
+    if (state.isExample){ state = blank(); }
+    state.items = items;
+    state.tax = Math.max(0, Math.round(+r.tax || 0)); state.service = Math.max(0, Math.round(+r.service || 0)); state.discount = Math.max(0, Math.round(+r.discount || 0));
+    state.scannedTotal = r.total ? Math.round(+r.total) : null;
+    if (r.merchant && !state.title) state.title = String(r.merchant).slice(0, 80);
+    state.date = new Date().toISOString(); state.billId = null; state.paid = {}; lastSavedJSON = null;
+    touch(true);
+    renderStruk();
+    st.className = "status ok"; st.textContent = `${items.length} menu terbaca. Periksa nama dan harga di bawah.`;
+  } catch(e){
+    const code = e && e.code;
+    const msg = {
+      rate_limited:"Terlalu banyak permintaan. Coba lagi sebentar lagi.",
+      image_rejected:"Foto tidak bisa dibaca. Coba foto lain (JPG atau PNG, cukup terang).",
+      invalid_json:"Menu di struk tidak terbaca. Coba foto yang lebih jelas atau isi manual.",
+      no_items:"Tidak ada menu yang terbaca. Coba foto yang lebih jelas atau isi manual.",
+      empty_completion:"Tidak ada menu yang terbaca. Coba foto yang lebih jelas atau isi manual.",
+      refused:"Foto ini tidak bisa dibaca. Isi menu secara manual.",
+      session_expired:"Sesi Anda berakhir. Masuk lagi ke Claude, lalu coba lagi.",
+      bad_code:"Kode akses salah. Periksa lagi kode di atas.",
+      too_large:"Foto terlalu besar. Coba foto dengan resolusi lebih kecil.",
+      not_configured:"Server belum diatur untuk membaca struk. Isi menu secara manual.",
+      offline:"Tidak bisa terhubung ke server. Periksa koneksi internet Anda."
+    }[code];
+    if (["not_granted","sampling_disabled","not_declared","capability_disabled","capability_removed","images_unavailable"].includes(code)){
+      disableScan(); st.textContent = "";
+    } else { st.className = "status err"; st.textContent = msg || "Gagal membaca struk. Coba lagi."; }
+  } finally { btn.disabled = !canScan(); }
+}
+function manualOnly(){
+  standalone = true;
+  disableScan();
+  $("#noScan").hidden = true;
+  $("#s0 h1").textContent = "Isi menu dari struk";
+  $("#s0 .lede").textContent = "Ketik nama menu, jumlah, dan harga total per baris sesuai struk. Isi total di struk untuk mengecek apakah semua menu sudah masuk.";
+  $("#exampleBanner").innerHTML = 'Ini contoh isian. Ubah langsung, atau <button data-act="reset">mulai dari kosong</button>';
+}
+function disableScan(){ sample = null; serverScan = false; $("#uploadBox").hidden = true; $("#noScan").hidden = false; }
+function canShareFiles(file){
+  try { const f = file || new File([new Blob(["x"], { type:"image/png" })], "x.png", { type:"image/png" }); return !!(navigator.canShare && navigator.canShare({ files:[f] })); }
+  catch(e){ return false; }
+}
+function blobToBase64(blob){
+  return new Promise((ok, fail) => { const fr = new FileReader(); fr.onload = () => ok(String(fr.result).split(",")[1]); fr.onerror = fail; fr.readAsDataURL(blob); });
+}
+async function scanViaServer(blob){
+  const image = await blobToBase64(blob);
+  let res;
+  try {
+    res = await fetch("/api/scan", { method:"POST", headers:{ "content-type":"application/json", "x-access-code": $("#accessCode") ? $("#accessCode").value.trim() : "" },
+      body: JSON.stringify({ image, mediaType: blob.type || "image/jpeg" }) });
+  } catch(e){ throw { code:"offline" }; }
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw { code: (data && data.code) || "upstream_error" };
+  return data;
+}
+async function setupServerScan(){
+  standalone = true;
+  imgLimits = { maxInputBytes: 1500000, mediaTypes:["image/jpeg","image/png","image/webp"] }; // keep uploads under Vercel's body limit
+  let cfg = null;
+  try { const r = await fetch("/api/scan", { cache:"no-store" }); if (r.ok) cfg = await r.json(); } catch(e){}
+  if (!cfg || !cfg.configured){ disableScan(); return; }
+  serverScan = true;
+  $("#btnScan").disabled = !canScan();
+  if (cfg.requiresCode){
+    const wrap = document.createElement("label"); wrap.className = "field";
+    wrap.innerHTML = '<span>Kode akses</span><input class="inp" id="accessCode" type="password" autocomplete="off" placeholder="Minta ke pemilik web">';
+    $("#btnScan").before(wrap);
+    const inp = $("#accessCode");
+    try { inp.value = localStorage.getItem(LS + "code") || ""; } catch(e){}
+    inp.addEventListener("input", () => { try { localStorage.setItem(LS + "code", inp.value.trim()); } catch(e){} });
+  }
+}
+
+/* ---------- events ---------- */
+function addPeopleFrom(text){
+  const names = String(text).split(/[,\n;]+/).map(s => s.trim().replace(/\s+/g, " ").slice(0, 40)).filter(Boolean);
+  let added = 0;
+  names.forEach(n => { if (!state.people.some(p => norm(p) === norm(n))){ state.people.push(n); added++; } });
+  return added;
+}
+document.addEventListener("click", async e => {
+  const b = e.target.closest("[data-act]"); if (!b) return;
+  const a = b.dataset.act;
+  if (a === "who" || a === "paid") return; // handled on change
+  if (a === "go"){ step = +b.dataset.to; view = "steps"; show(); }
+  else if (a === "history"){ view = "history"; histDel = null; show(); }
+  else if (a === "reset"){ state = blank(); scanFile = null; resetUpload(); touch(false); show(); }
+  else if (a === "newBill"){ state = blank(); scanFile = null; lastSavedJSON = null; resetUpload(); touch(false); step = 0; view = "steps"; show(); }
+  else if (a === "scan"){ scan(); }
+  else if (a === "addItem"){ state.items.push({ id:rid(), name:"", qty:1, price:0, who:[] }); touch(true); renderStruk(); const last = state.items[state.items.length - 1]; $("#n-" + last.id).focus(); }
+  else if (a === "delItem"){ const id = b.closest(".irow").dataset.id; state.items = state.items.filter(i => i.id !== id); touch(true); renderStruk(); }
+  else if (a === "addPerson"){ const inp = $("#personInput"); addPeopleFrom(inp.value); inp.value = ""; touch(true); renderPeople(); }
+  else if (a === "delPerson"){
+    const p = state.people[+b.dataset.i];
+    state.people.splice(+b.dataset.i, 1); state.items.forEach(it => it.who = (it.who || []).filter(w => w !== p)); delete state.paid[p];
+    if (state.payeePerson === p) state.payeePerson = null;
+    touch(true); renderPeople();
+  }
+  else if (a === "all"){
+    const it = state.items[+b.dataset.i];
+    const all = state.people.every(p => (it.who || []).includes(p));
+    it.who = all ? [] : state.people.slice(); touch(true); renderAssign();
+  }
+  else if (a === "splitQty"){
+    const i = +b.dataset.i, it = state.items[i];
+    const unit = Math.round(it.price / it.qty), parts = [];
+    const grp = "g" + rid();
+    for (let k = 0; k < it.qty; k++) parts.push({ id:rid(), name:it.name, qty:1, price: k === it.qty - 1 ? it.price - unit * (it.qty - 1) : unit, who:[], grp, part:k + 1, of:it.qty });
+    state.items.splice(i, 1, ...parts); touch(true); renderAssign();
+  }
+  else if (a === "merge" || a === "mergeConfirm"){
+    const g = b.dataset.g;
+    const parts = state.items.filter(x => x.grp === g); if (!parts.length) return;
+    const differ = new Set(parts.map(x => (x.who || []).slice().sort().join("|"))).size > 1;
+    if (a === "merge" && differ){ pendingMerge = g; renderAssign(); return; }
+    const who = state.people.filter(p => parts.some(x => (x.who || []).includes(p)));
+    const merged = { id:rid(), name:parts[0].name, qty:parts.length, price:parts.reduce((s, x) => s + x.price, 0), who };
+    const first = state.items.indexOf(parts[0]);
+    state.items = state.items.filter(x => x.grp !== g);
+    state.items.splice(first, 0, merged);
+    pendingMerge = null; touch(true); renderAssign();
+  }
+  else if (a === "cancelMerge"){ pendingMerge = null; renderAssign(); }
+  else if (a === "pickAcc"){
+    if (e.target.closest(".del")) return;
+    const id = b.dataset.id; const acc = accounts.find(x => x.id === id) || (state.payee && state.payee.id === id ? state.payee : null);
+    if (acc){ state.payee = Object.assign({}, acc); state.payeePerson = null; touch(true); pendingDel = null; renderAccounts(); }
+  }
+  else if (a === "askDelAcc"){ pendingDel = b.dataset.id; renderAccounts(); }
+  else if (a === "delAcc"){
+    accounts = accounts.filter(x => x.id !== b.dataset.id); pendingDel = null;
+    renderAccounts(); persistAccounts();
+  }
+  else if (a === "saveImg"){
+    if (!resultBlob) return;
+    const name = "split-" + (state.title || "bill").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) + ".png";
+    if (!downloads){
+      if (!standalone) return;
+      const file = new File([resultBlob], name, { type:"image/png" });
+      if (canShareFiles(file)){ try { await navigator.share({ files:[file], title: state.title || "Split bill" }); } catch(err){} return; }
+      const a = document.createElement("a"); a.href = URL.createObjectURL(resultBlob); a.download = name;
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+      return;
+    }
+    try { await downloads.save({ filename:name, data:resultBlob }); $("#copyStatus").className = "status ok"; $("#copyStatus").textContent = "Gambar disimpan."; }
+    catch(err){ $("#copyStatus").className = "status"; $("#copyStatus").textContent = err && err.code === "cancelled" || err && err.code === "declined" ? "" : "Gambar tidak tersimpan. Tekan lama gambar untuk menyimpan."; }
+  }
+  else if (a === "copyText"){ copy(summaryText(), "Ringkasan tersalin. Tempel di grup WhatsApp."); }
+  else if (a === "copyReminder"){
+    const t = reminderText();
+    if (!t){ $("#copyStatus").className = "status ok"; $("#copyStatus").textContent = "Semua sudah lunas."; return; }
+    copy(t, "Pesan tagihan tersalin.");
+  }
+  else if (a === "openBill"){
+    const bill = (renderHistory.cache || []).find(x => x.id === b.dataset.id); if (!bill) return;
+    state = Object.assign(blank(), { billId:bill.id, title:bill.title, date:bill.date, items:bill.items || [], tax:bill.tax || 0, service:bill.service || 0,
+      discount:bill.discount || 0, scannedTotal:bill.scannedTotal || null, people:bill.people || [], payee:bill.payee || null, payeePerson:bill.payeePerson || null, paid:Object.assign({}, bill.paid || {}), createdAt:bill.createdAt });
+    lastSavedJSON = JSON.stringify(Object.assign({}, billBody(), { updatedAt:0 }));
+    touch(false); step = 4; view = "steps"; show();
+  }
+  else if (a === "askDelBill"){ histDel = b.dataset.id; renderHistory(); }
+  else if (a === "delBill"){ const id = b.dataset.id; histDel = null; await deleteBill(id); renderHistory(); }
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Enter" && e.target.id === "personInput"){ e.preventDefault(); $("[data-act=addPerson]").click(); }
+  if ((e.key === "Enter" || e.key === " ") && e.target.classList && e.target.classList.contains("acc")){ e.preventDefault(); e.target.click(); }
+});
+document.addEventListener("paste", e => {
+  if (e.target.id !== "personInput") return;
+  const t = (e.clipboardData || {}).getData ? e.clipboardData.getData("text") : "";
+  if (t && /[,\n;]/.test(t)){ e.preventDefault(); addPeopleFrom(t); touch(true); renderPeople(); }
+});
+document.addEventListener("change", e => {
+  const t = e.target;
+  if (t.id === "file"){
+    scanFile = t.files && t.files[0] || null;
+    if (scanFile){ const th = $("#thumb"); if (th.dataset.url) URL.revokeObjectURL(th.dataset.url); th.dataset.url = URL.createObjectURL(scanFile); th.src = th.dataset.url; th.hidden = false; $("#dropText").hidden = true; $("#scanStatus").className = "status"; $("#scanStatus").textContent = "Foto siap. Tekan Baca struk."; }
+    $("#btnScan").disabled = !canScan();
+  }
+  if (t.dataset.act === "who"){
+    const it = state.items[+t.dataset.i], p = state.people[+t.dataset.pi];
+    it.who = (it.who || []).filter(w => w !== p); if (t.checked) it.who.push(p);
+    it.who = state.people.filter(x => it.who.includes(x));
+    touch(true); renderAssign();
+    const again = document.getElementById(t.id); if (again) again.focus({ preventScroll:true });
+  }
+  if (t.id === "payeePerson"){ state.payeePerson = t.value; touch(true); renderPayeeWho(); return; }
+  if (t.dataset.act === "paid"){
+    const p = state.people[+t.dataset.pi]; state.paid[p] = t.checked; if (!t.checked) delete state.paid[p];
+    touch(true); renderPaid(); saveBill(); drawResult(calc());
+  }
+});
+document.addEventListener("input", e => {
+  const t = e.target;
+  if (t.id === "title"){ state.title = t.value; touch(true); }
+  else if (["tax","service","discount"].includes(t.id)){ state[t.id] = num(t.value); touch(true); renderTotals(); }
+  else if (t.id === "receiptTotal"){ state.scannedTotal = num(t.value) || null; touch(true); renderTotals(); }
+  else if (t.dataset.f){
+    const it = state.items.find(i => i.id === t.closest(".irow").dataset.id); if (!it) return;
+    if (t.dataset.f === "name") it.name = t.value;
+    if (t.dataset.f === "qty") it.qty = Math.max(1, num(t.value) || 1);
+    if (t.dataset.f === "price") it.price = num(t.value);
+    touch(true); renderTotals();
+  }
+});
+document.addEventListener("focusout", e => {
+  const t = e.target;
+  if (t.dataset && t.dataset.f === "price"){ const v = num(t.value); t.value = v ? fmtN(v) : ""; }
+  if (["tax","service","discount","receiptTotal"].includes(t.id)){ const v = num(t.value); t.value = v ? fmtN(v) : ""; }
+});
+$("#accForm").addEventListener("submit", e => {
+  e.preventDefault();
+  const owner = $("#accOwner").value.trim(), bank = $("#accBank").value.trim(), number = $("#accNumber").value.trim();
+  const st = $("#accStatus");
+  if (!owner || !bank || !number){ st.className = "status err"; st.textContent = "Isi nama pemilik, bank, dan nomor rekening."; return; }
+  const acc = { id:"a" + rid(), owner:owner.slice(0, 60), bank:bank.slice(0, 40), number:number.slice(0, 40) };
+  state.payee = acc; state.payeePerson = null; touch(true);
+  if ($("#accSave").checked){ accounts.push(acc); persistAccounts(); st.className = "status ok"; st.textContent = storeMode === "account" ? "Dipakai dan disimpan ke akun." : "Dipakai dan disimpan di browser ini."; }
+  else { st.className = "status ok"; st.textContent = "Dipakai untuk split ini."; }
+  $("#accOwner").value = $("#accBank").value = $("#accNumber").value = "";
+  renderAccounts();
+});
+function resetUpload(){ $("#file").value = ""; const th = $("#thumb"); th.hidden = true; th.removeAttribute("src"); $("#dropText").hidden = false; $("#scanStatus").textContent = ""; $("#btnScan").disabled = true; }
+
+/* ---------- boot ---------- */
+show();
+(async () => {
+  const c = window.claude;
+  if (!c || !c.use){ if (SCAN_ENABLED) await setupServerScan(); else manualOnly(); renderStoreNotes(); if (view === "steps" && step === 4) show(); return; }
+  const [u, d, s, dl] = await Promise.all(["user", "db", "sample", "downloads"].map(n => c.use(n).catch(() => null)));
+  downloads = dl;
+  if (s){ sample = s; try { const lim = await s.limits(); imgLimits = lim && lim.images || null; } catch(e){ imgLimits = null; }
+    if (!imgLimits) disableScan(); else { $("#file").accept = imgLimits.mediaTypes.join(","); $("#btnScan").disabled = !scanFile; } }
+  else disableScan();
+  if (u && d){ try { uid = await u.id(); } catch(e){ uid = null; } if (uid){ db = d; storeMode = "account"; } }
+  await loadAccounts();
+  renderStoreNotes();
+  if (view === "steps" && (step === 3 || step === 4)) show();
+  if (view === "steps" && step === 4) $("#btnSaveImg").hidden = !downloads;
+})();
+})();
+</script>
+</body>
+</html>
