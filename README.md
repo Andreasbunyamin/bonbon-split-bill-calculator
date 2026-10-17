@@ -4,7 +4,7 @@
 
 Web split bill untuk makan bareng. Masukkan menu dari struk, nama yang ikut makan, lalu pilih siapa pesan apa. Hasilnya berupa gambar ringkasan per orang, lengkap dengan rekening tujuan transfer, yang siap dikirim ke grup. Host bisa mencentang siapa yang sudah bayar dan menyalin pesan tagihan untuk yang belum.
 
-**Demo:** `https://bonbon-split-bill-calculator.vercel.app/` 
+**Demo:** https://bonbon-split-bill-calculator.vercel.app/ 
 
 <!-- Tambahkan screenshot: docs/screenshot.png -->
 
