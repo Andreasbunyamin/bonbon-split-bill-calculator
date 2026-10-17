@@ -4,7 +4,7 @@
 
 Web split bill untuk makan bareng. Masukkan menu dari struk, nama yang ikut makan, lalu pilih siapa pesan apa. Hasilnya berupa gambar ringkasan per orang, lengkap dengan rekening tujuan transfer, yang siap dikirim ke grup. Host bisa mencentang siapa yang sudah bayar dan menyalin pesan tagihan untuk yang belum.
 
-**Demo:** `https://<nama-project>.vercel.app` *(ganti setelah deploy)*
+**Demo:** `https://bonbon-split-bill-calculator.vercel.app/` 
 
 <!-- Tambahkan screenshot: docs/screenshot.png -->
 
@@ -63,13 +63,6 @@ python -m http.server 8000   # buka http://localhost:8000
 ## Tech stack
 
 HTML, CSS, dan JavaScript tanpa framework, Canvas API untuk membuat gambar hasil, Web Share API untuk berbagi ke aplikasi chat, dan `localStorage` untuk penyimpanan.
-
-## Roadmap
-
-- [ ] Baca struk otomatis dari foto (kodenya sudah disiapkan di balik flag `SCAN_ENABLED` di `index.html`)
-- [ ] Pilihan cara bagi (rata atau proporsional) untuk pajak, service, dan diskon
-- [ ] QRIS atau tautan e-wallet di gambar hasil
-- [ ] Link split bersama: peserta memilih menunya sendiri
 
 ## Riwayat perubahan
 
