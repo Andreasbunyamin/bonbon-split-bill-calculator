@@ -24,8 +24,10 @@ Web split bill untuk makan bareng. Masukkan menu dari struk, nama yang ikut maka
 |---|---|
 | Menu milik satu orang | Ditanggung orang itu |
 | Menu sharing | Dibagi rata ke orang yang dipilih |
-| Pajak, service, diskon | Dibagi rata ke semua peserta |
-| Pembulatan | Total per orang dibulatkan ke rupiah terdekat |
+| Pajak | Dibagi proporsional sesuai nilai pesanan masing-masing |
+| Service | Dibagi rata ke semua peserta |
+| Diskon | Dibagi proporsional sesuai nilai pesanan masing-masing (yang pesan lebih banyak, potongannya lebih besar) |
+| Pembulatan | Total per orang dibulatkan ke rupiah, dan jumlahnya selalu sama persis dengan total struk |
 
 **Penerima transfer.** Di langkah Rekening, pilih peserta mana yang menerima transfer. Peserta itu ditandai sebagai **Penerima** dan tidak masuk daftar tagihan. Kalau nama pemilik rekening sama dengan nama peserta (tanpa membedakan huruf besar-kecil), pilihan terisi otomatis. Kalau berbeda, misalnya peserta "Andreas" dan rekening atas nama "Andreas Natanael", pilih manual. Nama pemilik rekening di gambar hasil tetap mengikuti yang diisi, sesuai buku tabungan.
 
@@ -65,6 +67,26 @@ HTML, CSS, dan JavaScript tanpa framework, Canvas API untuk membuat gambar hasil
 ## Roadmap
 
 - [ ] Baca struk otomatis dari foto (kodenya sudah disiapkan di balik flag `SCAN_ENABLED` di `index.html`)
-- [ ] Pajak dan service proporsional sebagai opsi
+- [ ] Pilihan cara bagi (rata atau proporsional) untuk pajak, service, dan diskon
 - [ ] QRIS atau tautan e-wallet di gambar hasil
 - [ ] Link split bersama: peserta memilih menunya sendiri
+
+## Riwayat perubahan
+
+### 1.0.1 (17 Oktober 2026)
+
+**Perhitungan**
+- Pajak sekarang dibagi proporsional sesuai nilai pesanan masing-masing. Sebelumnya dibagi rata ke semua peserta.
+- Diskon sekarang dibagi proporsional sesuai nilai pesanan masing-masing. Sebelumnya dibagi rata ke semua peserta.
+- Service tetap dibagi rata ke semua peserta.
+- Jumlah tagihan per orang sekarang selalu sama persis dengan total struk. Sebelumnya bisa selisih Rp1 karena pembulatan.
+
+**Tampilan**
+- Gambar hasil dan teks yang disalin ke WhatsApp menampilkan pajak, service, dan diskon di baris terpisah untuk setiap orang.
+- Nomor versi tampil di bagian bawah halaman.
+
+**Catatan:** split lama di Riwayat akan dihitung ulang dengan aturan baru saat dibuka. Kalau pajak atau diskonnya tidak nol, nominal per orang bisa berbeda dari yang sudah dibagikan sebelumnya.
+
+### 1.0.0 (14 Oktober 2026)
+
+Rilis pertama: input menu manual dengan cek total struk, assign menu per orang (termasuk sharing), pecah dan gabung porsi, pilihan penerima transfer, gambar hasil yang bisa dibagikan ke WhatsApp, checklist pembayaran dan pesan tagihan, serta rekening dan riwayat yang tersimpan di browser.

@@ -180,6 +180,7 @@ textarea.inp{min-height:140px;font-family:var(--mono);font-size:13px}
 .hitem .open{flex:1;min-width:0;border:0;background:none;text-align:left;cursor:pointer;padding:0;display:flex;flex-direction:column;gap:2px}
 .hitem .open b{overflow-wrap:anywhere}
 .hitem .open span{font-size:13px;color:var(--muted)}
+.appver{margin-top:32px;text-align:center;font-family:var(--mono);font-size:12px;color:var(--muted)}
 .hempty{padding:24px;text-align:center;color:var(--muted);background:var(--surface);border:1px dashed var(--line);border-radius:var(--r)}
 
 @media (max-width:440px){
@@ -296,6 +297,7 @@ textarea.inp{min-height:140px;font-family:var(--mono);font-size:13px}
       <div class="navrow"><button class="ghost" data-act="go" data-to="0">Kembali ke split</button><button class="primary" data-act="newBill">Split baru</button></div>
     </section>
   </main>
+  <footer class="appver">BonBon v1.0.1</footer>
 </div>
 
 <script>
@@ -431,11 +433,24 @@ function calc(){
       per[w].items.push({ name:it.name, qty:it.qty, share, n:who.length });
     });
   });
-  const extra = state.tax + state.service - state.discount;
   const n = state.people.length;
-  const ex = n ? extra / n : 0;
-  state.people.forEach(p => { per[p].extra = ex; per[p].total = Math.round(per[p].sub + ex); });
-  return { per, unassigned, itemsTotal, extra, ex, grand: itemsTotal + extra };
+  // Service: split equally. Tax and discount: in proportion to what each person ordered.
+  const assigned = state.people.reduce((s, p) => s + per[p].sub, 0);
+  const share = (amt, p) => !amt || !n ? 0 : assigned > 0 ? amt * per[p].sub / assigned : amt / n;
+  const svc = n ? state.service / n : 0;
+  state.people.forEach(p => {
+    const tax = share(state.tax, p), disc = share(state.discount, p);
+    per[p].tax = tax; per[p].svc = svc; per[p].disc = disc; per[p].extra = tax + svc - disc;
+    per[p].raw = per[p].sub + tax + svc - disc;
+  });
+  // Round so the per-person totals add up exactly: floor everyone, then give the leftover rupiah
+  // to the people with the largest fractional parts.
+  state.people.forEach(p => per[p].total = Math.floor(per[p].raw));
+  let left = Math.round(state.people.reduce((s, p) => s + per[p].raw, 0)) - state.people.reduce((s, p) => s + per[p].total, 0);
+  state.people.slice().sort((a, b) => (per[b].raw - per[b].total) - (per[a].raw - per[a].total))
+    .forEach(p => { if (left > 0){ per[p].total++; left--; } });
+  const extra = state.tax + state.service - state.discount;
+  return { per, unassigned, itemsTotal, extra, ex: svc, grand: itemsTotal + extra };
 }
 function payeeName(st){
   st = st || state;
@@ -630,10 +645,19 @@ function paint(ctx, c){
       T(right, X2, y, `400 20px ${MONO}`, soft, "right");
       y += 30;
     });
-    if (Math.round(d.extra) !== 0){
-      const parts = [state.tax ? "pajak" : "", state.service ? "service" : "", state.discount ? "diskon" : ""].filter(Boolean).join("+");
-      T(`${parts || "biaya lain"} (÷${state.people.length})`, X1 + 18, y, `400 20px ${MONO}`, soft);
-      T(fmt(d.extra), X2, y, `400 20px ${MONO}`, soft, "right");
+    if (Math.round(d.tax) !== 0){
+      T("pajak (proporsional)", X1 + 18, y, `400 20px ${MONO}`, soft);
+      T(fmt(d.tax), X2, y, `400 20px ${MONO}`, soft, "right");
+      y += 30;
+    }
+    if (Math.round(d.svc) !== 0){
+      T(`service (÷${state.people.length})`, X1 + 18, y, `400 20px ${MONO}`, soft);
+      T(fmt(d.svc), X2, y, `400 20px ${MONO}`, soft, "right");
+      y += 30;
+    }
+    if (Math.round(d.disc) !== 0){
+      T(`diskon (proporsional)`, X1 + 18, y, `400 20px ${MONO}`, soft);
+      T(fmt(-d.disc), X2, y, `400 20px ${MONO}`, soft, "right");
       y += 30;
     }
     y += 10; dash(y, [3, 7]); y += 46;
@@ -704,7 +728,9 @@ function summaryText(){
   const body = state.people.map(p => {
     const d = c.per[p];
     const lines = d.items.map(it => `  - ${it.name}${it.n > 1 ? ` (÷${it.n})` : ""}: ${fmt(it.share)}`);
-    if (Math.round(d.extra)) lines.push(`  - Pajak/service (÷${state.people.length}): ${fmt(d.extra)}`);
+    if (Math.round(d.tax)) lines.push(`  - Pajak (proporsional): ${fmt(d.tax)}`);
+    if (Math.round(d.svc)) lines.push(`  - Service (÷${state.people.length}): ${fmt(d.svc)}`);
+    if (Math.round(d.disc)) lines.push(`  - Diskon (proporsional): ${fmt(-d.disc)}`);
     return `*${p}: ${fmt(d.total)}*${isPayee(p) ? " (penerima)" : state.paid[p] ? " ✓ lunas" : ""}\n` + lines.join("\n");
   }).join("\n\n");
   return head + "\n" + body + `\n\nTotal: ${fmt(c.grand)}` + (state.payee ? "\n" + payeeLine() : "");
