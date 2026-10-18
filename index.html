@@ -103,6 +103,12 @@ h2{font-size:17px;font-weight:700;margin:8px 0 0}
 
 .extras{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
 .extras .inp{font-family:var(--mono);text-align:right}
+.svc-mode{display:flex;flex-direction:column;gap:6px}
+.svc-mode>span{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:3px;padding:3px;background:var(--sunk);border:1px solid var(--line);border-radius:10px}
+.seg button{border:0;background:none;border-radius:8px;padding:9px 10px;font-size:14px;font-weight:600;color:var(--muted);cursor:pointer}
+.seg button[aria-checked="true"]{background:var(--surface);color:var(--ink);box-shadow:0 0 0 1px var(--line)}
+.svc-mode .note{margin:0}
 .totals{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;display:flex;flex-direction:column;gap:4px;font-size:14px}
 .trow{display:flex;justify-content:space-between;gap:12px}
 .trow span:last-child{font-family:var(--mono);font-variant-numeric:tabular-nums}
@@ -250,6 +256,14 @@ textarea.inp{min-height:140px;font-family:var(--mono);font-size:13px}
         <label class="field"><span>Service</span><input class="inp" id="service" inputmode="numeric" placeholder="0"></label>
         <label class="field"><span>Diskon</span><input class="inp" id="discount" inputmode="numeric" placeholder="0"></label>
       </div>
+      <div class="svc-mode" id="svcMode" hidden>
+        <span id="svcModeLabel">Service dibagi</span>
+        <div class="seg" role="radiogroup" aria-labelledby="svcModeLabel">
+          <button type="button" role="radio" aria-checked="true" data-act="svcMode" data-mode="rata">Rata per orang</button>
+          <button type="button" role="radio" aria-checked="false" data-act="svcMode" data-mode="proporsional">Proporsional</button>
+        </div>
+        <p class="note" id="svcHint"></p>
+      </div>
       <label class="field"><span>Total di struk (opsional, untuk cek)</span><input class="inp" id="receiptTotal" inputmode="numeric" placeholder="mis. 196.900" style="font-family:var(--mono);text-align:right"></label>
       <div class="totals" id="totals"></div>
       <div class="navrow"><button class="ghost" data-act="home">Beranda</button><button class="primary" data-act="go" data-to="1">Lanjut: siapa yang makan</button></div>
@@ -319,7 +333,7 @@ textarea.inp{min-height:140px;font-family:var(--mono);font-size:13px}
       <div class="navrow"><button class="ghost" data-act="home">Beranda</button><button class="primary" data-act="newBill">Split baru</button></div>
     </section>
   </main>
-  <footer class="appver">BonBon v1.1.0</footer>
+  <footer class="appver">BonBon v1.1.1</footer>
 </div>
 
 <script>
@@ -335,7 +349,7 @@ const STEPS = ["Struk", "Peserta", "Menu", "Rekening", "Hasil"];
 const LS = "bonbon.v1.";
 
 /* ---------- state ---------- */
-function blank(){ return { billId:null, title:"", date:new Date().toISOString(), items:[], tax:0, service:0, discount:0, scannedTotal:null, people:[], payee:null, payeePerson:null, paid:{}, isExample:false, draft:true, step:0, createdAt:null, updatedAt:0 }; }
+function blank(){ return { billId:null, title:"", date:new Date().toISOString(), items:[], tax:0, service:0, discount:0, scannedTotal:null, people:[], payee:null, payeePerson:null, paid:{}, isExample:false, draft:true, step:0, createdAt:null, updatedAt:0, serviceMode:"rata" }; }
 function example(){
   const s = blank();
   s.isExample = true; s.title = "Warung Sate Pak Kumis (contoh)";
@@ -410,7 +424,7 @@ function billBody(){
   const c = calc();
   const isDraft = state.draft === true;
   return { title: String(state.title || "").trim(), date: state.date, items: state.items, tax: state.tax, service: state.service, discount: state.discount,
-    scannedTotal: state.scannedTotal ?? null, people: state.people, payee: state.payee ?? null, payeePerson: state.payeePerson ?? null, paid: state.paid, grand: Math.round(c.grand),
+    scannedTotal: state.scannedTotal ?? null, people: state.people, payee: state.payee ?? null, payeePerson: state.payeePerson ?? null, paid: state.paid, grand: Math.round(c.grand), serviceMode: svcProp() ? "proporsional" : "rata",
     draft: isDraft, step: isDraft ? Math.min(state.step || 0, 3) : 4,
     createdAt: state.createdAt || Date.now(), updatedAt: Date.now() };
 }
@@ -448,6 +462,7 @@ async function deleteBill(id){
 }
 
 /* ---------- math ---------- */
+const svcProp = () => state.serviceMode === "proporsional";
 function calc(){
   const per = {}; state.people.forEach(p => per[p] = { items:[], sub:0 });
   const unassigned = []; let itemsTotal = 0;
@@ -470,12 +485,13 @@ function calc(){
     });
   });
   const n = state.people.length;
-  // Service: split equally. Tax and discount: in proportion to what each person ordered.
+  // Tax and discount: in proportion to what each person ordered.
+  // Service: split equally (delivery or app fees), or in proportion like tax (a restaurant's service charge).
   const assigned = state.people.reduce((s, p) => s + per[p].sub, 0);
   const share = (amt, p) => !amt || !n ? 0 : assigned > 0 ? amt * per[p].sub / assigned : amt / n;
-  const svc = n ? state.service / n : 0;
+  const svcEq = n ? state.service / n : 0;
   state.people.forEach(p => {
-    const tax = share(state.tax, p), disc = share(state.discount, p);
+    const tax = share(state.tax, p), disc = share(state.discount, p), svc = svcProp() ? share(state.service, p) : svcEq;
     per[p].tax = tax; per[p].svc = svc; per[p].disc = disc; per[p].extra = tax + svc - disc;
     per[p].raw = per[p].sub + tax + svc - disc;
   });
@@ -486,7 +502,7 @@ function calc(){
   state.people.slice().sort((a, b) => (per[b].raw - per[b].total) - (per[a].raw - per[a].total))
     .forEach(p => { if (left > 0){ per[p].total++; left--; } });
   const extra = state.tax + state.service - state.discount;
-  return { per, unassigned, itemsTotal, extra, ex: svc, grand: itemsTotal + extra };
+  return { per, unassigned, itemsTotal, extra, ex: svcEq, grand: itemsTotal + extra };
 }
 function payeeName(st){
   st = st || state;
@@ -517,8 +533,17 @@ function show(){
   window.scrollTo({ top:0 });
 }
 
+function renderSvcMode(){
+  const m = svcProp() ? "proporsional" : "rata";
+  $("#svcMode").hidden = !state.service;
+  document.querySelectorAll("#svcMode [data-mode]").forEach(b => b.setAttribute("aria-checked", String(b.dataset.mode === m)));
+  $("#svcHint").textContent = m === "rata"
+    ? "Cocok untuk ongkos kirim atau biaya layanan aplikasi, misalnya GrabFood. Semua orang membayar sama."
+    : "Cocok untuk service charge restoran. Yang pesan lebih banyak membayar service lebih besar, seperti pajak.";
+}
 function renderStruk(){
   $("#title").value = state.title;
+  renderSvcMode();
   ["tax","service","discount"].forEach(k => $("#" + k).value = state[k] ? fmtN(state[k]) : "");
   $("#receiptTotal").value = state.scannedTotal ? fmtN(state.scannedTotal) : "";
   const rows = state.items.map(it => `
@@ -697,7 +722,7 @@ function paint(ctx, c){
       y += 30;
     }
     if (Math.round(d.svc) !== 0){
-      T(`service (÷${state.people.length})`, X1 + 18, y, `400 20px ${MONO}`, soft);
+      T(svcProp() ? "service (proporsional)" : `service (÷${state.people.length})`, X1 + 18, y, `400 20px ${MONO}`, soft);
       T(fmt(d.svc), X2, y, `400 20px ${MONO}`, soft, "right");
       y += 30;
     }
@@ -775,7 +800,7 @@ function summaryText(){
     const d = c.per[p];
     const lines = d.items.map(it => `  - ${it.name}${it.n > 1 ? ` (÷${it.n})` : ""}: ${fmt(it.share)}`);
     if (Math.round(d.tax)) lines.push(`  - Pajak (proporsional): ${fmt(d.tax)}`);
-    if (Math.round(d.svc)) lines.push(`  - Service (÷${state.people.length}): ${fmt(d.svc)}`);
+    if (Math.round(d.svc)) lines.push(`  - Service (${svcProp() ? "proporsional" : "÷" + state.people.length}): ${fmt(d.svc)}`);
     if (Math.round(d.disc)) lines.push(`  - Diskon (proporsional): ${fmt(-d.disc)}`);
     return `*${p}: ${fmt(d.total)}*${isPayee(p) ? " (penerima)" : state.paid[p] ? " ✓ lunas" : ""}\n` + lines.join("\n");
   }).join("\n\n");
@@ -985,6 +1010,7 @@ document.addEventListener("click", async e => {
   else if (a === "newBill"){ flushSave(); state = blank(); scanFile = null; lastSavedJSON = null; dirty = false; resetUpload(); touch(false); step = 0; view = "steps"; show(); }
   else if (a === "example"){ flushSave(); state = example(); scanFile = null; lastSavedJSON = null; dirty = false; resetUpload(); touch(false); step = 0; view = "steps"; show(); }
   else if (a === "cancelDel"){ histDel = null; rerenderList(); }
+  else if (a === "svcMode"){ if (state.serviceMode !== b.dataset.mode){ state.serviceMode = b.dataset.mode; touch(true); } renderSvcMode(); renderTotals(); }
   else if (a === "scan"){ scan(); }
   else if (a === "addItem"){ state.items.push({ id:rid(), name:"", qty:1, price:0, who:[] }); touch(true); renderStruk(); const last = state.items[state.items.length - 1]; $("#n-" + last.id).focus(); }
   else if (a === "delItem"){ const id = b.closest(".irow").dataset.id; state.items = state.items.filter(i => i.id !== id); touch(true); renderStruk(); }
@@ -1057,7 +1083,7 @@ document.addEventListener("click", async e => {
     const isDraft = bill.draft === true;
     state = Object.assign(blank(), { billId:bill.id, title: bill.title === "Tanpa nama" ? "" : (bill.title || ""), date:bill.date || new Date().toISOString(),
       items:bill.items || [], tax:bill.tax || 0, service:bill.service || 0, discount:bill.discount || 0, scannedTotal:bill.scannedTotal || null,
-      people:bill.people || [], payee:bill.payee || null, payeePerson:bill.payeePerson || null, paid:bill.paid || {},
+      people:bill.people || [], payee:bill.payee || null, payeePerson:bill.payeePerson || null, paid:bill.paid || {}, serviceMode: bill.serviceMode === "proporsional" ? "proporsional" : "rata",
       draft:isDraft, step: isDraft ? Math.min(bill.step || 0, 3) : 4, createdAt:bill.createdAt || Date.now(), updatedAt:bill.updatedAt || 0 });
     scanFile = null; resetUpload(); histDel = null;
     lastSavedJSON = JSON.stringify(Object.assign({}, billBody(), { updatedAt:0 })); dirty = false;
@@ -1098,7 +1124,7 @@ document.addEventListener("change", e => {
 document.addEventListener("input", e => {
   const t = e.target;
   if (t.id === "title"){ state.title = t.value; touch(true); }
-  else if (["tax","service","discount"].includes(t.id)){ state[t.id] = num(t.value); touch(true); renderTotals(); }
+  else if (["tax","service","discount"].includes(t.id)){ state[t.id] = num(t.value); touch(true); renderTotals(); if (t.id === "service") renderSvcMode(); }
   else if (t.id === "receiptTotal"){ state.scannedTotal = num(t.value) || null; touch(true); renderTotals(); }
   else if (t.dataset.f){
     const it = state.items.find(i => i.id === t.closest(".irow").dataset.id); if (!it) return;

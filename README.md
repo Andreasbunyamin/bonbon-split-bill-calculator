@@ -26,7 +26,7 @@ Web split bill untuk makan bareng. Masukkan menu dari struk, nama yang ikut maka
 | Menu milik satu orang | Ditanggung orang itu |
 | Menu sharing | Dibagi rata ke orang yang dipilih |
 | Pajak | Dibagi proporsional sesuai nilai pesanan masing-masing |
-| Service | Dibagi rata ke semua peserta |
+| Service | Pilih per split: **rata per orang** (cocok untuk ongkos kirim atau biaya layanan aplikasi seperti GrabFood) atau **proporsional** sesuai nilai pesanan (cocok untuk service charge restoran). Bawaannya rata. |
 | Diskon | Dibagi proporsional sesuai nilai pesanan masing-masing (yang pesan lebih banyak, potongannya lebih besar) |
 | Pembulatan | Total per orang dibulatkan ke rupiah, dan jumlahnya selalu sama persis dengan total struk |
 
@@ -66,6 +66,16 @@ python -m http.server 8000   # buka http://localhost:8000
 HTML, CSS, dan JavaScript tanpa framework, Canvas API untuk membuat gambar hasil, Web Share API untuk berbagi ke aplikasi chat, dan `localStorage` untuk penyimpanan.
 
 ## Riwayat perubahan
+
+### 1.1.1 (18 Oktober 2026)
+
+**Perhitungan**
+- Service sekarang bisa dibagi rata per orang atau proporsional sesuai nilai pesanan. Pilihannya muncul di bawah kolom Service setelah nominalnya diisi.
+- Rata cocok untuk ongkos kirim atau biaya layanan aplikasi pesan-antar. Proporsional cocok untuk service charge restoran, dan hasilnya sama dengan menghitung persentase service dari pesanan masing-masing.
+- Bawaannya tetap rata, jadi split yang sudah tersimpan tidak berubah nominalnya.
+
+**Tampilan**
+- Gambar hasil dan teks WhatsApp menulis "service (proporsional)" atau "service (÷jumlah orang)" sesuai pilihan.
 
 ### 1.1.0 (18 Oktober 2026)
 
