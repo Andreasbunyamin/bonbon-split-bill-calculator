@@ -202,6 +202,14 @@ textarea.inp{min-height:140px;font-family:var(--mono);font-size:13px}
 .hitem .tag{white-space:nowrap;flex:none}
 .ghost.sm,.danger.sm{padding:7px 12px;font-size:13.5px;border-radius:9px;flex:none}
 .tag.draft{background:var(--sunk);color:var(--muted);border:1px solid var(--line)}
+.pick{cursor:pointer}
+.pick input{width:20px;height:20px;accent-color:var(--accent);flex:none;margin:0}
+.hitem.pick:has(input:checked){border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+#histList .hgroup+.hgroup{margin-top:14px}
+.merge-start{align-self:flex-start}
+.mpages{display:flex;flex-direction:column;gap:24px}
+.mpage{display:flex;flex-direction:column;gap:10px}
+.mpage h2{margin:0}
 
 @media (max-width:440px){
   h1{font-size:23px}
@@ -329,11 +337,26 @@ textarea.inp{min-height:140px;font-family:var(--mono);font-size:13px}
     <section id="sH" hidden>
       <h1>Riwayat</h1>
       <p class="lede" id="histNote"></p>
+      <button class="ghost merge-start" id="btnMerge" data-act="mergeStart" hidden>Gabungkan beberapa split</button>
       <div class="hlist" id="histList"></div>
-      <div class="navrow"><button class="ghost" data-act="home">Beranda</button><button class="primary" data-act="newBill">Split baru</button></div>
+      <div class="navrow" id="histNav"></div>
+    </section>
+
+    <!-- Gabungan -->
+    <section id="sM" hidden>
+      <h1>Tagihan gabungan</h1>
+      <p class="lede" id="mergeLede"></p>
+      <label class="field"><span>Judul</span><input class="inp" id="mergeTitle" autocomplete="off"></label>
+      <div id="mergeFlags"></div>
+      <div class="mpages" id="mergePages"></div>
+      <div class="actions"><button class="primary" id="btnMergeShareAll" data-act="mergeShareAll" hidden>Bagikan semua gambar</button><button class="ghost" data-act="mergeCopy">Salin semua sebagai teks</button></div>
+      <p class="note" id="mergeHint"></p>
+      <p class="status" id="mergeStatus" role="status"></p>
+      <textarea class="inp" id="mergeFallback" readonly hidden aria-label="Teks untuk disalin"></textarea>
+      <div class="navrow"><button class="ghost" data-act="mergeBack">Kembali</button><button class="primary" data-act="home">Selesai</button></div>
     </section>
   </main>
-  <footer class="appver">BonBon v1.1.1</footer>
+  <footer class="appver">BonBon v1.2.0</footer>
 </div>
 
 <script>
@@ -521,6 +544,7 @@ function show(){
   $("#exampleBanner").hidden = view !== "steps" || !state.isExample;
   if (view === "home"){ $("#sHome").hidden = false; renderHome(); window.scrollTo({ top:0 }); return; }
   if (view === "history"){ $("#sH").hidden = false; renderHistory(); window.scrollTo({ top:0 }); return; }
+  if (view === "merge"){ $("#sM").hidden = false; renderMerge(); window.scrollTo({ top:0 }); return; }
   if (state.step !== step){
     // Remember where an unfinished split stopped, so "Lanjutkan" returns there.
     state.step = step;
@@ -791,6 +815,194 @@ async function drawResult(c){
   $("#imgHint").textContent = (downloads || standalone) ? "Atau tekan lama gambar untuk menyimpan, lalu kirim ke grup." : "Tekan lama (atau klik kanan) gambar untuk menyimpan, lalu kirim ke grup.";
 }
 
+/* ---------- merge several splits into one bill ---------- */
+let mergeMode = false, mergeSel = new Set(), mergeBills = [], mergeBlobs = [], mergeUrls = [], mergeTok = 0, mergeT = null, mergeData = null;
+function billToState(bill){
+  const isDraft = bill.draft === true;
+  return Object.assign(blank(), { billId:bill.id, title: bill.title === "Tanpa nama" ? "" : (bill.title || ""), date:bill.date || new Date().toISOString(),
+    items:bill.items || [], tax:bill.tax || 0, service:bill.service || 0, discount:bill.discount || 0, scannedTotal:bill.scannedTotal || null,
+    people:bill.people || [], payee:bill.payee || null, payeePerson:bill.payeePerson || null, paid:bill.paid || {}, serviceMode: bill.serviceMode === "proporsional" ? "proporsional" : "rata",
+    draft:isDraft, step: isDraft ? Math.min(bill.step || 0, 3) : 4, createdAt:bill.createdAt || Date.now(), updatedAt:bill.updatedAt || 0 });
+}
+// Each split is first calculated on its own (same rules as its own result), then amounts are summed per person (by name,
+// ignoring upper/lower case) and grouped per transfer destination: one page per bank account.
+function computeMerge(bills){
+  const keep = state, names = new Map(), pages = new Map(), flags = [];
+  try {
+    bills.forEach(raw => {
+      const bs = billToState(JSON.parse(JSON.stringify(raw)));
+      state = bs;
+      const c = calc(), t = bs.title || "Tanpa nama", pn = payeeName(bs);
+      bs.people.forEach(p => { const k = norm(p); if (!names.has(k)) names.set(k, p); });
+      if (c.unassigned.length) flags.push(`${t}: ${c.unassigned.length} menu belum ada pemiliknya, jadi belum ikut dihitung.`);
+      if (!bs.payee) flags.push(`${t}: rekening penerima belum dipilih.`);
+      const key = bs.payee ? norm(bs.payee.bank) + "|" + String(bs.payee.number || "").replace(/\D/g, "") : "none";
+      if (!pages.has(key)) pages.set(key, { payee: bs.payee, to: "", rows: new Map(), bills: new Set() });
+      const pg = pages.get(key);
+      if (!pg.to) pg.to = pn || (bs.payee ? bs.payee.owner : "");
+      bs.people.forEach(p => {
+        if (p === pn) return;
+        const k = norm(p);
+        if (!pg.rows.has(k)) pg.rows.set(k, { name: names.get(k), lines: [], due: 0 });
+        const row = pg.rows.get(k), amt = c.per[p].total, paid = !!bs.paid[p];
+        row.lines.push({ title: t, amt, paid });
+        if (!paid) row.due += amt;
+        pg.bills.add(bs.billId);
+      });
+    });
+  } finally { state = keep; }
+  // Names that look like the same person are still counted separately: point them out.
+  const ks = [...names.keys()];
+  ks.forEach((a, i) => ks.slice(i + 1).forEach(b => {
+    const x = a.replace(/[\s.]/g, ""), y = b.replace(/[\s.]/g, "");
+    if (Math.min(x.length, y.length) >= 2 && (x.startsWith(y) || y.startsWith(x)))
+      flags.push(`Periksa nama: "${names.get(a)}" dan "${names.get(b)}" dihitung sebagai dua orang berbeda. Kalau orangnya sama, samakan penulisannya di split tersebut.`);
+  }));
+  const out = [...pages.values()].filter(pg => pg.rows.size).map(pg => {
+    const rows = [...pg.rows.values()];
+    return { payee: pg.payee, to: pg.to || "(rekening belum dipilih)", rows, nBills: pg.bills.size, total: rows.reduce((s, r) => s + r.due, 0) };
+  });
+  return { pages: out, flags };
+}
+function defaultMergeTitle(bills){
+  const ds = bills.map(b => new Date(b.date || b.createdAt || Date.now())).sort((a, b) => a - b);
+  const long = d => d.toLocaleDateString("id-ID", { day:"numeric", month:"long", year:"numeric" });
+  const a = ds[0], z = ds[ds.length - 1];
+  return "Gabungan " + (a.toDateString() === z.toDateString() ? long(a) : `${a.toLocaleDateString("id-ID", { day:"numeric", month:"short" })} – ${long(z)}`);
+}
+const mergeTitleNow = () => $("#mergeTitle").value.trim() || defaultMergeTitle(mergeBills);
+const fileSlug = s => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || "gabungan";
+const dayKey = b => { const d = new Date(b.date || b.createdAt || 0); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
+function mergeText(m, title){
+  return `*${title}*\n\n` + m.pages.map(pg => {
+    const acct = pg.payee ? `${pg.payee.bank} ${pg.payee.number} a.n. ${pg.payee.owner}` : "rekening belum dipilih";
+    return `*Transfer ke ${pg.to}* (${acct})\n` + pg.rows.map(r => `*${r.name}: ${r.due ? fmt(r.due) : "lunas"}*\n` +
+      r.lines.map(l => `  - ${l.title}: ${fmt(l.amt)}${l.paid ? " (lunas)" : ""}`).join("\n")).join("\n");
+  }).join("\n\n");
+}
+async function renderReceipt(painter, data){
+  try { await Promise.all([document.fonts.load(`700 28px ${MONO}`), document.fonts.load(`400 20px ${MONO}`), document.fonts.load(`800 36px ${SANS}`), document.fonts.load(`700 28px ${SANS}`), document.fonts.load(`500 20px ${SANS}`)]); } catch(e){}
+  const L = painter(document.createElement("canvas").getContext("2d"), data);
+  const S = 2, cv = document.createElement("canvas");
+  cv.width = L.W * S; cv.height = L.H * S;
+  const ctx = cv.getContext("2d"); ctx.scale(S, S);
+  ctx.fillStyle = "#E3E9E6"; ctx.fillRect(0, 0, L.W, L.H);
+  const x0 = L.M, x1 = L.W - L.M, y0 = L.M, y1 = L.H - L.M, z = 10;
+  ctx.beginPath(); ctx.moveTo(x0, y0 + z);
+  for (let x = x0; x < x1; x += z * 2){ ctx.lineTo(Math.min(x + z, x1), y0); ctx.lineTo(Math.min(x + z * 2, x1), y0 + z); }
+  ctx.lineTo(x1, y1 - z);
+  for (let x = x1; x > x0; x -= z * 2){ ctx.lineTo(Math.max(x - z, x0), y1); ctx.lineTo(Math.max(x - z * 2, x0), y1 - z); }
+  ctx.closePath(); ctx.fillStyle = "#FFFFFF"; ctx.fill();
+  ctx.textBaseline = "alphabetic";
+  painter(ctx, data).ops.forEach(f => f());
+  return new Promise(r => cv.toBlob(r, "image/png"));
+}
+// One page of the merged bill: everyone who owes one recipient, each split on its own line, a total per person, then the account.
+function paintMerge(ctx, d){
+  const W = 720, M = 28, X1 = M + 36, X2 = W - M - 36, IW = X2 - X1;
+  const ink = "#16211D", soft = "#5E6B66", green = "#0F7B5F", faint = "#A3AEA9";
+  const pg = d.page;
+  let y = M + 58;
+  const ops = [];
+  const T = (txt, x, yy, font, color, align) => ops.push(() => { ctx.font = font; ctx.fillStyle = color; ctx.textAlign = align || "left"; ctx.fillText(txt, x, yy); });
+  const dash = (yy, pat) => ops.push(() => { ctx.save(); ctx.strokeStyle = "#B9C4BF"; ctx.lineWidth = 2; ctx.setLineDash(pat || [8, 8]); ctx.beginPath(); ctx.moveTo(X1, yy); ctx.lineTo(X2, yy); ctx.stroke(); ctx.restore(); });
+  function badge(x, yy, txt, bg, fg){ ops.push(() => { ctx.font = `700 14px ${MONO}`; const w = ctx.measureText(txt).width + 16; ctx.fillStyle = bg; roundRect(ctx, x, yy - 22, w, 26, 6); ctx.fill(); ctx.fillStyle = fg; ctx.textAlign = "left"; ctx.fillText(txt, x + 8, yy - 3); }); }
+
+  T("TAGIHAN GABUNGAN", X1, y, `700 19px ${MONO}`, green);
+  if (d.pageCount > 1) T(`${d.pageNo}/${d.pageCount}`, X2, y, `400 19px ${MONO}`, soft, "right");
+  y += 50;
+  ctx.font = `800 36px ${SANS}`;
+  const words = String(d.title).split(/\s+/); let line = "", lines = [];
+  words.forEach(w => { const t = line ? line + " " + w : w; if (ctx.measureText(t).width > IW && line){ lines.push(line); line = w; } else line = t; });
+  if (line) lines.push(line); lines = lines.slice(0, 3);
+  lines.forEach(l => { T(l, X1, y, `800 36px ${SANS}`, ink); y += 44; });
+  ctx.font = `500 19px ${SANS}`;
+  T(fit(ctx, `Bayar ke ${pg.to} · ${pg.rows.length} orang · ${pg.nBills} split`, IW), X1, y, `500 19px ${SANS}`, soft);
+  y += 30; dash(y); y += 52;
+
+  pg.rows.forEach(r => {
+    ctx.font = `700 28px ${SANS}`;
+    const nm = fit(ctx, r.name, IW - 140);
+    T(nm, X1, y, `700 28px ${SANS}`, ink);
+    if (!r.due) badge(X1 + ctx.measureText(nm).width + 12, y, "LUNAS", "#DFF0EA", green);
+    y += 36;
+    r.lines.forEach(l => {
+      ctx.font = `400 20px ${MONO}`;
+      T(fit(ctx, l.title + (l.paid ? " (lunas)" : ""), IW - 170), X1 + 18, y, `400 20px ${MONO}`, l.paid ? faint : soft);
+      T(fmt(l.amt), X2, y, `400 20px ${MONO}`, l.paid ? faint : soft, "right");
+      y += 30;
+    });
+    y += 6;
+    T("Total", X1 + 18, y, `700 22px ${SANS}`, ink);
+    T(fmt(r.due), X2, y, `700 26px ${MONO}`, ink, "right");
+    y += 22; dash(y, [3, 7]); y += 46;
+  });
+
+  y -= 8;
+  T("TOTAL", X1, y, `700 22px ${MONO}`, ink);
+  T(fmt(pg.total), X2, y, `700 30px ${MONO}`, ink, "right");
+  y += 46;
+  const top = y, hBox = pg.payee ? 172 : 96;
+  ops.push(() => { ctx.fillStyle = "#E4F2EC"; roundRect(ctx, X1 - 4, top, IW + 8, hBox, 14); ctx.fill(); });
+  T("TRANSFER KE", X1 + 20, top + 38, `700 17px ${MONO}`, green);
+  if (pg.payee){
+    ctx.font = `700 22px ${SANS}`; T(fit(ctx, pg.payee.bank, IW - 40), X1 + 20, top + 72, `700 22px ${SANS}`, ink);
+    ctx.font = `700 34px ${MONO}`; T(fit(ctx, pg.payee.number, IW - 40), X1 + 20, top + 116, `700 34px ${MONO}`, ink);
+    ctx.font = `500 20px ${SANS}`; T(fit(ctx, "a.n. " + pg.payee.owner, IW - 40), X1 + 20, top + 150, `500 20px ${SANS}`, soft);
+  } else {
+    T("Rekening penerima belum dipilih", X1 + 20, top + 72, `600 20px ${SANS}`, "#9A520A");
+  }
+  y = top + hBox + 34;
+  T("dihitung dengan BonBon · Split Bill Calculator", W / 2, y, `400 16px ${MONO}`, "#97A39E", "center");
+  y += 40;
+  return { W, H: y + M, M, ops };
+}
+async function saveBlob(blob, name, st){
+  if (!blob) return;
+  const isStandalone = typeof standalone !== "undefined" && standalone;
+  if (downloads){
+    try { await downloads.save({ filename:name, data:blob }); st.className = "status ok"; st.textContent = "Gambar disimpan."; }
+    catch(err){ st.className = "status"; st.textContent = err && (err.code === "cancelled" || err.code === "declined") ? "" : "Gambar tidak tersimpan. Tekan lama gambar untuk menyimpan."; }
+    return;
+  }
+  if (isStandalone){
+    const file = new File([blob], name, { type:"image/png" });
+    if (typeof canShareFiles === "function" && canShareFiles(file)){ try { await navigator.share({ files:[file], title:name }); } catch(e){} return; }
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    return;
+  }
+  st.className = "status"; st.textContent = "Tekan lama gambar untuk menyimpan.";
+}
+async function renderMerge(){
+  const tok = ++mergeTok;
+  const m = computeMerge(mergeBills); mergeData = m;
+  const title = mergeTitleNow();
+  const isStandalone = typeof standalone !== "undefined" && standalone;
+  const canSave = !!downloads || isStandalone;
+  const saveLabel = isStandalone && typeof canShareFiles === "function" && canShareFiles() ? "Bagikan / simpan gambar" : "Simpan gambar";
+  $("#mergeLede").textContent = `${mergeBills.length} split digabung. Setiap split dihitung sendiri dulu, lalu dijumlahkan per orang dan dikelompokkan per penerima transfer. Setiap penerima punya gambar sendiri.`;
+  $("#mergeFlags").innerHTML = m.flags.map(f => `<div class="flag">${esc(f)}</div>`).join("");
+  mergeUrls.forEach(u => URL.revokeObjectURL(u)); mergeUrls = [];
+  $("#mergePages").innerHTML = m.pages.map((pg, i) => `<div class="mpage"><h2>${m.pages.length > 1 ? `${i + 1}/${m.pages.length} · ` : ""}Transfer ke ${esc(pg.to)}</h2>
+      <figure class="shot"><img id="mimg-${i}" alt="Tagihan gabungan, dibayar ke ${esc(pg.to)}"></figure>
+      ${canSave ? `<button class="primary" data-act="mergeSave" data-i="${i}">${saveLabel}</button>` : ""}</div>`).join("")
+    || `<div class="hempty"><p>Tidak ada yang perlu dibayar: di split yang dipilih, semua orang adalah penerima transfer.</p></div>`;
+  $("#mergeHint").textContent = !m.pages.length ? "" : canSave ? "Atau tekan lama gambar untuk menyimpan, lalu kirim ke grup." : "Tekan lama (atau klik kanan) gambar untuk menyimpan, lalu kirim ke grup.";
+  $("#btnMergeShareAll").hidden = true;
+  mergeBlobs = [];
+  for (let i = 0; i < m.pages.length; i++){
+    const blob = await renderReceipt(paintMerge, { title, page: m.pages[i], pageNo: i + 1, pageCount: m.pages.length });
+    if (tok !== mergeTok) return;
+    mergeBlobs[i] = blob;
+    const img = document.getElementById("mimg-" + i);
+    if (img && blob){ const u = URL.createObjectURL(blob); mergeUrls.push(u); img.src = u; }
+  }
+  if (m.pages.length > 1 && isStandalone && navigator.canShare){
+    try { $("#btnMergeShareAll").hidden = !navigator.canShare({ files: mergeBlobs.map((bl, i) => new File([bl], `gabungan-${i + 1}.png`, { type:"image/png" })) }); } catch(e){}
+  }
+}
+
 /* ---------- text outputs ---------- */
 function payeeLine(){ return state.payee ? `Transfer ke ${state.payee.bank} ${state.payee.number} a.n. ${state.payee.owner}` : ""; }
 function summaryText(){
@@ -813,8 +1025,7 @@ function reminderText(){
   return `Halo! Pengingat patungan *${state.title || "makan bareng"}* yang belum dibayar:\n` +
     due.map(p => `- ${p}: ${fmt(c.per[p].total)}`).join("\n") + (state.payee ? `\n\n${payeeLine()}` : "") + "\nTerima kasih!";
 }
-function copy(text, okMsg){
-  const st = $("#copyStatus"), ta = $("#copyFallback");
+function copy(text, okMsg, st = $("#copyStatus"), ta = $("#copyFallback")){
   const fallback = () => { ta.hidden = false; ta.value = text; ta.focus(); ta.select(); st.className = "status"; st.textContent = "Salin teks di bawah ini secara manual."; };
   try {
     navigator.clipboard.writeText(text).then(() => { ta.hidden = true; st.className = "status ok"; st.textContent = okMsg; }, fallback);
@@ -869,13 +1080,45 @@ async function renderHome(){
   if (!bills.length) out = `<div class="hempty"><p><b>Belum ada split.</b><br>Tekan "Buat split baru" untuk mulai, atau lihat contoh dulu supaya tahu hasilnya seperti apa.</p><button class="ghost" data-act="example">Lihat contoh</button></div>`;
   $("#homeLists").innerHTML = out;
 }
-async function renderHistory(){
+function renderHistNav(){
+  const nav = $("#histNav");
+  if (!mergeMode){ nav.innerHTML = `<button class="ghost" data-act="home">Beranda</button><button class="primary" data-act="newBill">Split baru</button>`; return; }
+  const n = mergeSel.size;
+  nav.innerHTML = `<button class="ghost" data-act="mergeCancel">Batal</button><button class="primary" data-act="mergeGo" ${n < 2 ? "disabled" : ""}>${n < 2 ? "Pilih minimal 2 split" : `Gabungkan ${n} split`}</button>`;
+}
+async function renderHistory(cached){
   renderStoreNotes();
-  $("#histList").innerHTML = `<p class="note">Memuat…</p>`;
-  const bills = await loadBills();
-  if (view !== "history") return;
-  billsCache = bills;
+  $("#sH h1").textContent = mergeMode ? "Gabungkan split" : "Riwayat";
+  if (mergeMode) $("#histNote").textContent = "Pilih split yang mau digabung jadi satu tagihan, misalnya semua split hari ini. Tulis nama orang dengan sama di setiap split supaya totalnya bisa dijumlahkan.";
+  $("#btnMerge").hidden = true;
+  renderHistNav();
+  let bills;
+  if (cached) bills = billsCache;
+  else {
+    $("#histList").innerHTML = `<p class="note">Memuat…</p>`;
+    bills = await loadBills();
+    if (view !== "history") return;
+    billsCache = bills;
+  }
   if (!bills.length){ $("#histList").innerHTML = `<div class="hempty"><p>Belum ada riwayat. Split tersimpan otomatis begitu Anda mulai mengisinya.</p></div>`; return; }
+  const done = bills.filter(b => b.draft !== true);
+  if (mergeMode){
+    const days = [];
+    done.forEach(b => {
+      const k = dayKey(b);
+      let g = days.find(x => x.key === k);
+      if (!g){ g = { key:k, label:new Date(b.date || b.createdAt).toLocaleDateString("id-ID", { weekday:"long", day:"numeric", month:"long", year:"numeric" }), bills:[] }; days.push(g); }
+      g.bills.push(b);
+    });
+    $("#histList").innerHTML = days.map(g => {
+      const all = g.bills.every(b => mergeSel.has(b.id));
+      return `<div class="hgroup"><div class="hhead"><h2>${esc(g.label)}</h2><button class="link" data-act="mergeDay" data-day="${g.key}">${all ? "Batalkan pilihan" : "Pilih semua"}</button></div><div class="hlist">` +
+        g.bills.map(b => `<label class="hitem pick"><input type="checkbox" data-act="mergePick" data-id="${esc(b.id)}" ${mergeSel.has(b.id) ? "checked" : ""}><span class="open"><b>${billTitle(b)}</b><span>${fmt(b.grand || 0)} · ${(b.people || []).length} orang · ke ${esc(payeeName(b) || (b.payee ? b.payee.owner : "rekening belum dipilih"))}</span></span></label>`).join("") +
+        `</div></div>`;
+    }).join("") || `<div class="hempty"><p>Belum ada split yang selesai untuk digabung.</p></div>`;
+    return;
+  }
+  $("#btnMerge").hidden = done.length < 2;
   $("#histList").innerHTML = bills.map(b => {
     const ppl = b.people || [];
     const st = billStatus(b);
@@ -1002,15 +1245,42 @@ function addPeopleFrom(text){
 document.addEventListener("click", async e => {
   const b = e.target.closest("[data-act]"); if (!b) return;
   const a = b.dataset.act;
-  if (a === "who" || a === "paid") return; // handled on change
+  if (a === "who" || a === "paid" || a === "mergePick") return; // handled on change
   if (a === "go"){ step = +b.dataset.to; view = "steps"; show(); }
-  else if (a === "home"){ flushSave(); view = "home"; histDel = null; show(); }
-  else if (a === "history"){ flushSave(); view = "history"; histDel = null; show(); }
+  else if (a === "home"){ flushSave(); view = "home"; histDel = null; mergeMode = false; mergeSel.clear(); show(); }
+  else if (a === "history"){ flushSave(); view = "history"; histDel = null; mergeMode = false; mergeSel.clear(); show(); }
   else if (a === "reset"){ state = blank(); scanFile = null; lastSavedJSON = null; dirty = false; resetUpload(); touch(false); show(); }
   else if (a === "newBill"){ flushSave(); state = blank(); scanFile = null; lastSavedJSON = null; dirty = false; resetUpload(); touch(false); step = 0; view = "steps"; show(); }
   else if (a === "example"){ flushSave(); state = example(); scanFile = null; lastSavedJSON = null; dirty = false; resetUpload(); touch(false); step = 0; view = "steps"; show(); }
   else if (a === "cancelDel"){ histDel = null; rerenderList(); }
   else if (a === "svcMode"){ if (state.serviceMode !== b.dataset.mode){ state.serviceMode = b.dataset.mode; touch(true); } renderSvcMode(); renderTotals(); }
+  else if (a === "mergeStart"){ mergeMode = true; mergeSel.clear(); histDel = null; renderHistory(true); window.scrollTo({ top:0 }); }
+  else if (a === "mergeCancel"){ mergeMode = false; mergeSel.clear(); renderHistory(true); }
+  else if (a === "mergeDay"){
+    const ids = billsCache.filter(x => x.draft !== true && dayKey(x) === b.dataset.day).map(x => x.id);
+    const all = ids.every(id => mergeSel.has(id));
+    ids.forEach(id => all ? mergeSel.delete(id) : mergeSel.add(id));
+    renderHistory(true);
+  }
+  else if (a === "mergeGo"){
+    mergeBills = billsCache.filter(x => mergeSel.has(x.id) && x.draft !== true).map(x => JSON.parse(JSON.stringify(x)))
+      .sort((x, y) => (new Date(x.date || x.createdAt) - new Date(y.date || y.createdAt)) || ((x.createdAt || 0) - (y.createdAt || 0)));
+    if (mergeBills.length < 2) return;
+    $("#mergeTitle").value = defaultMergeTitle(mergeBills);
+    $("#mergeStatus").textContent = ""; $("#mergeFallback").hidden = true;
+    view = "merge"; show();
+  }
+  else if (a === "mergeBack"){ view = "history"; show(); }
+  else if (a === "mergeSave"){
+    const k = +b.dataset.i, pg = mergeData && mergeData.pages[k]; if (!pg) return;
+    saveBlob(mergeBlobs[k], fileSlug(mergeTitleNow() + " " + pg.to) + ".png", $("#mergeStatus"));
+  }
+  else if (a === "mergeShareAll"){
+    try { await navigator.share({ files: mergeBlobs.map((bl, k) => new File([bl], fileSlug(mergeTitleNow() + " " + mergeData.pages[k].to) + ".png", { type:"image/png" })), title: mergeTitleNow() }); } catch(err){}
+  }
+  else if (a === "mergeCopy"){
+    if (mergeData) copy(mergeText(mergeData, mergeTitleNow()), "Tagihan gabungan tersalin. Tempel di grup WhatsApp.", $("#mergeStatus"), $("#mergeFallback"));
+  }
   else if (a === "scan"){ scan(); }
   else if (a === "addItem"){ state.items.push({ id:rid(), name:"", qty:1, price:0, who:[] }); touch(true); renderStruk(); const last = state.items[state.items.length - 1]; $("#n-" + last.id).focus(); }
   else if (a === "delItem"){ const id = b.closest(".irow").dataset.id; state.items = state.items.filter(i => i.id !== id); touch(true); renderStruk(); }
@@ -1080,11 +1350,7 @@ document.addEventListener("click", async e => {
     const found = billsCache.find(x => x.id === b.dataset.id); if (!found) return;
     const bill = JSON.parse(JSON.stringify(found)); // stored copies can be read-only; edit a private copy
     flushSave();
-    const isDraft = bill.draft === true;
-    state = Object.assign(blank(), { billId:bill.id, title: bill.title === "Tanpa nama" ? "" : (bill.title || ""), date:bill.date || new Date().toISOString(),
-      items:bill.items || [], tax:bill.tax || 0, service:bill.service || 0, discount:bill.discount || 0, scannedTotal:bill.scannedTotal || null,
-      people:bill.people || [], payee:bill.payee || null, payeePerson:bill.payeePerson || null, paid:bill.paid || {}, serviceMode: bill.serviceMode === "proporsional" ? "proporsional" : "rata",
-      draft:isDraft, step: isDraft ? Math.min(bill.step || 0, 3) : 4, createdAt:bill.createdAt || Date.now(), updatedAt:bill.updatedAt || 0 });
+    state = billToState(bill);
     scanFile = null; resetUpload(); histDel = null;
     lastSavedJSON = JSON.stringify(Object.assign({}, billBody(), { updatedAt:0 })); dirty = false;
     touch(false); step = state.step; view = "steps"; show();
@@ -1103,6 +1369,7 @@ document.addEventListener("paste", e => {
 });
 document.addEventListener("change", e => {
   const t = e.target;
+  if (t.dataset.act === "mergePick"){ t.checked ? mergeSel.add(t.dataset.id) : mergeSel.delete(t.dataset.id); renderHistory(true); return; }
   if (t.id === "file"){
     scanFile = t.files && t.files[0] || null;
     if (scanFile){ const th = $("#thumb"); if (th.dataset.url) URL.revokeObjectURL(th.dataset.url); th.dataset.url = URL.createObjectURL(scanFile); th.src = th.dataset.url; th.hidden = false; $("#dropText").hidden = true; $("#scanStatus").className = "status"; $("#scanStatus").textContent = "Foto siap. Tekan Baca struk."; }
@@ -1125,6 +1392,7 @@ document.addEventListener("input", e => {
   const t = e.target;
   if (t.id === "title"){ state.title = t.value; touch(true); }
   else if (["tax","service","discount"].includes(t.id)){ state[t.id] = num(t.value); touch(true); renderTotals(); if (t.id === "service") renderSvcMode(); }
+  else if (t.id === "mergeTitle"){ clearTimeout(mergeT); mergeT = setTimeout(renderMerge, 400); }
   else if (t.id === "receiptTotal"){ state.scannedTotal = num(t.value) || null; touch(true); renderTotals(); }
   else if (t.dataset.f){
     const it = state.items.find(i => i.id === t.closest(".irow").dataset.id); if (!it) return;

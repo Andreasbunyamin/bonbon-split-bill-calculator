@@ -17,6 +17,7 @@ Web split bill untuk makan bareng. Masukkan menu dari struk, nama yang ikut maka
 - **Pecah dan gabung porsi.** Item seperti "Es Teh ×5" bisa dipecah jadi 5 porsi untuk orang yang berbeda, lalu digabung lagi kalau perlu.
 - **Gambar hasil bergaya struk thermal** berisi rincian per orang dan rekening tujuan. Di HP, gambar bisa langsung dibagikan ke WhatsApp; di laptop, gambar terunduh sebagai PNG.
 - **Status pembayaran.** Checklist lunas atau belum, plus pesan tagihan otomatis untuk yang belum bayar.
+- **Gabungkan beberapa split.** Dari Riwayat, pilih beberapa split (misalnya semua split dalam satu hari) lalu gabungkan jadi satu tagihan. Total setiap orang dijumlahkan berdasarkan nama, dan tagihan dikelompokkan per penerima transfer: satu gambar untuk setiap penerima.
 - **Rekening tersimpan dan riwayat split** di browser pengguna. Split tersimpan otomatis sejak isian pertama, termasuk yang belum selesai.
 
 ## Aturan perhitungan
@@ -31,6 +32,8 @@ Web split bill untuk makan bareng. Masukkan menu dari struk, nama yang ikut maka
 | Pembulatan | Total per orang dibulatkan ke rupiah, dan jumlahnya selalu sama persis dengan total struk |
 
 **Penerima transfer.** Di langkah Rekening, pilih peserta mana yang menerima transfer. Peserta itu ditandai sebagai **Penerima** dan tidak masuk daftar tagihan. Kalau nama pemilik rekening sama dengan nama peserta (tanpa membedakan huruf besar-kecil), pilihan terisi otomatis. Kalau berbeda, misalnya peserta "Andreas" dan rekening atas nama "Andreas Natanael", pilih manual. Nama pemilik rekening di gambar hasil tetap mengikuti yang diisi, sesuai buku tabungan.
+
+**Tagihan gabungan.** Setiap split dihitung sendiri dulu dengan aturan di atas, lalu nominal per orang dijumlahkan berdasarkan nama (tanpa membedakan huruf besar-kecil) dan dikelompokkan per rekening tujuan. Split yang sudah ditandai lunas untuk seseorang tetap tampil, tapi tidak ikut dijumlahkan.
 
 ## Privasi
 
@@ -66,6 +69,18 @@ python -m http.server 8000   # buka http://localhost:8000
 HTML, CSS, dan JavaScript tanpa framework, Canvas API untuk membuat gambar hasil, Web Share API untuk berbagi ke aplikasi chat, dan `localStorage` untuk penyimpanan.
 
 ## Riwayat perubahan
+
+### 1.2.0 (19 Oktober 2026)
+
+**Fitur baru**
+- Gabungkan beberapa split jadi satu tagihan, lewat tombol "Gabungkan beberapa split" di Riwayat. Split dikelompokkan per tanggal, dengan tombol "Pilih semua" untuk setiap hari.
+- Setiap split dihitung sendiri dulu, lalu total setiap orang dijumlahkan berdasarkan nama dan dikelompokkan per penerima transfer. Setiap penerima punya gambar sendiri, berisi rincian per split, total per orang, dan rekening tujuan.
+- Judul tagihan gabungan bisa diubah, dan seluruh tagihan bisa disalin sebagai satu teks untuk WhatsApp.
+- Peringatan saat ada nama yang mirip tapi ditulis berbeda (misalnya "Nico" dan "Nicolas"), split tanpa rekening penerima, atau menu yang belum ada pemiliknya.
+
+**Catatan**
+- Nama dicocokkan tanpa membedakan huruf besar-kecil, jadi "Nb" dan "NB" dianggap orang yang sama.
+- Split yang sudah ditandai lunas untuk seseorang tetap ditampilkan, tapi tidak ikut dijumlahkan.
 
 ### 1.1.1 (18 Oktober 2026)
 
