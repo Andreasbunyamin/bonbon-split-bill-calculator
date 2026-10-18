@@ -210,6 +210,9 @@ textarea.inp{min-height:140px;font-family:var(--mono);font-size:13px}
 .mpages{display:flex;flex-direction:column;gap:24px}
 .mpage{display:flex;flex-direction:column;gap:10px}
 .mpage h2{margin:0}
+.netbox{display:flex;flex-direction:column;gap:6px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px}
+.netbox .cb{font-weight:700;font-size:15px}
+.netbox .note{margin:0}
 
 @media (max-width:440px){
   h1{font-size:23px}
@@ -348,6 +351,10 @@ textarea.inp{min-height:140px;font-family:var(--mono);font-size:13px}
       <p class="lede" id="mergeLede"></p>
       <label class="field"><span>Judul</span><input class="inp" id="mergeTitle" autocomplete="off"></label>
       <div id="mergeFlags"></div>
+      <div class="netbox" id="mergeNetBox" hidden>
+        <label class="cb"><input type="checkbox" id="mergeNet" checked> Sederhanakan transfer</label>
+        <p class="note" id="mergeNetInfo"></p>
+      </div>
       <div class="mpages" id="mergePages"></div>
       <div class="actions"><button class="primary" id="btnMergeShareAll" data-act="mergeShareAll" hidden>Bagikan semua gambar</button><button class="ghost" data-act="mergeCopy">Salin semua sebagai teks</button></div>
       <p class="note" id="mergeHint"></p>
@@ -356,7 +363,7 @@ textarea.inp{min-height:140px;font-family:var(--mono);font-size:13px}
       <div class="navrow"><button class="ghost" data-act="mergeBack">Kembali</button><button class="primary" data-act="home">Selesai</button></div>
     </section>
   </main>
-  <footer class="appver">BonBon v1.2.0</footer>
+  <footer class="appver">BonBon v1.2.1</footer>
 </div>
 
 <script>
@@ -816,7 +823,7 @@ async function drawResult(c){
 }
 
 /* ---------- merge several splits into one bill ---------- */
-let mergeMode = false, mergeSel = new Set(), mergeBills = [], mergeBlobs = [], mergeUrls = [], mergeTok = 0, mergeT = null, mergeData = null;
+let mergeMode = false, mergeSel = new Set(), mergeBills = [], mergeBlobs = [], mergeUrls = [], mergeTok = 0, mergeT = null, mergeData = null, mergeNet = true;
 function billToState(bill){
   const isDraft = bill.draft === true;
   return Object.assign(blank(), { billId:bill.id, title: bill.title === "Tanpa nama" ? "" : (bill.title || ""), date:bill.date || new Date().toISOString(),
@@ -837,13 +844,14 @@ function computeMerge(bills){
       if (c.unassigned.length) flags.push(`${t}: ${c.unassigned.length} menu belum ada pemiliknya, jadi belum ikut dihitung.`);
       if (!bs.payee) flags.push(`${t}: rekening penerima belum dipilih.`);
       const key = bs.payee ? norm(bs.payee.bank) + "|" + String(bs.payee.number || "").replace(/\D/g, "") : "none";
-      if (!pages.has(key)) pages.set(key, { payee: bs.payee, to: "", rows: new Map(), bills: new Set() });
+      if (!pages.has(key)) pages.set(key, { payee: bs.payee, to: "", person: false, rows: new Map(), bills: new Set() });
       const pg = pages.get(key);
-      if (!pg.to) pg.to = pn || (bs.payee ? bs.payee.owner : "");
+      if (pn && !pg.person){ pg.to = pn; pg.person = true; }
+      else if (!pg.to) pg.to = bs.payee ? bs.payee.owner : "";
       bs.people.forEach(p => {
         if (p === pn) return;
         const k = norm(p);
-        if (!pg.rows.has(k)) pg.rows.set(k, { name: names.get(k), lines: [], due: 0 });
+        if (!pg.rows.has(k)) pg.rows.set(k, { key: k, name: names.get(k), lines: [], due: 0 });
         const row = pg.rows.get(k), amt = c.per[p].total, paid = !!bs.paid[p];
         row.lines.push({ title: t, amt, paid });
         if (!paid) row.due += amt;
@@ -860,10 +868,54 @@ function computeMerge(bills){
   }));
   const out = [...pages.values()].filter(pg => pg.rows.size).map(pg => {
     const rows = [...pg.rows.values()];
-    return { payee: pg.payee, to: pg.to || "(rekening belum dipilih)", rows, nBills: pg.bills.size, total: rows.reduce((s, r) => s + r.due, 0) };
+    return { payee: pg.payee, to: pg.to || "(rekening belum dipilih)", toKey: norm(pg.to), rows, nBills: pg.bills.size, total: rows.reduce((s, r) => s + r.due, 0), notes: [] };
   });
   return { pages: out, flags };
 }
+// When A owes B and B also owes A, only the difference is transferred: the one who owes more pays it to the other.
+// Every other transfer keeps its recipient, so each page still matches the splits it came from.
+function applyNetting(m){
+  const pages = m.pages.map(pg => Object.assign({}, pg, { rows: pg.rows.map(r => Object.assign({}, r, { lines: r.lines.slice() })), notes: [] }));
+  const owes = {}, nameOf = {};
+  pages.forEach(pg => pg.rows.forEach(r => {
+    nameOf[r.key] = r.name;
+    owes[r.key] = owes[r.key] || {};
+    owes[r.key][pg.toKey] = (owes[r.key][pg.toKey] || 0) + r.due;
+  }));
+  pages.forEach(pg => { if (!nameOf[pg.toKey]) nameOf[pg.toKey] = pg.to; });
+  const reduce = (debtor, creditor, off) => {
+    const src = [...new Set(pages.filter(pg => pg.toKey === debtor).flatMap(pg => pg.rows.filter(r => r.key === creditor)
+      .flatMap(r => r.lines.filter(l => !l.paid && !l.offset).map(l => l.title))))].join(", ");
+    let left = off;
+    pages.filter(pg => pg.toKey === creditor).forEach(pg => pg.rows.filter(r => r.key === debtor).forEach(r => {
+      const cut = Math.min(left, r.due); if (cut <= 0) return;
+      r.due -= cut; left -= cut;
+      r.lines.push({ title: `Potong utang ${nameOf[creditor]} ke ${nameOf[debtor]}`, src, amt: -cut, offset: true });
+    }));
+  };
+  const pairs = [];
+  Object.keys(owes).forEach(a => Object.keys(owes[a]).forEach(b => {
+    if (a >= b) return;
+    const ab = owes[a][b] || 0, ba = (owes[b] || {})[a] || 0;
+    if (!ab || !ba) return;
+    const off = Math.min(ab, ba);
+    pairs.push({ a: nameOf[a], b: nameOf[b], off, net: Math.abs(ab - ba), payer: ab > ba ? nameOf[a] : ab < ba ? nameOf[b] : null, receiver: ab > ba ? nameOf[b] : ab < ba ? nameOf[a] : null });
+    reduce(a, b, off); reduce(b, a, off);
+  }));
+  pages.forEach(pg => {
+    pg.rows = pg.rows.filter(r => {
+      const cut = -r.lines.filter(l => l.offset).reduce((s, l) => s + l.amt, 0);
+      if (r.due > 0 || !cut) return true;
+      pg.notes.push(`${r.name} tidak perlu transfer ke ${pg.to}: ${fmt(cut)} sudah dipotong dari transfer ${pg.to} ke ${r.name}.`);
+      return false;
+    });
+    pg.total = pg.rows.reduce((s, r) => s + r.due, 0);
+  });
+  return { pages: pages.filter(pg => pg.rows.length), flags: m.flags, pairs };
+}
+const pairText = p => p.payer
+  ? `${p.a} dan ${p.b} saling berutang, jadi dihitung selisihnya: ${p.payer} cukup transfer ${fmt(p.net)} ke ${p.receiver}.`
+  : `${p.a} dan ${p.b} saling berutang dengan nominal yang sama (${fmt(p.off)}), jadi impas.`;
 function defaultMergeTitle(bills){
   const ds = bills.map(b => new Date(b.date || b.createdAt || Date.now())).sort((a, b) => a - b);
   const long = d => d.toLocaleDateString("id-ID", { day:"numeric", month:"long", year:"numeric" });
@@ -877,7 +929,8 @@ function mergeText(m, title){
   return `*${title}*\n\n` + m.pages.map(pg => {
     const acct = pg.payee ? `${pg.payee.bank} ${pg.payee.number} a.n. ${pg.payee.owner}` : "rekening belum dipilih";
     return `*Transfer ke ${pg.to}* (${acct})\n` + pg.rows.map(r => `*${r.name}: ${r.due ? fmt(r.due) : "lunas"}*\n` +
-      r.lines.map(l => `  - ${l.title}: ${fmt(l.amt)}${l.paid ? " (lunas)" : ""}`).join("\n")).join("\n");
+      r.lines.map(l => `  - ${l.title}${l.src ? ` (${l.src})` : ""}: ${fmt(l.amt)}${l.paid ? " (lunas)" : ""}`).join("\n")).join("\n") +
+      (pg.notes && pg.notes.length ? "\n" + pg.notes.map(n => `_${n}_`).join("\n") : "");
   }).join("\n\n");
 }
 async function renderReceipt(painter, data){
@@ -928,14 +981,23 @@ function paintMerge(ctx, d){
     y += 36;
     r.lines.forEach(l => {
       ctx.font = `400 20px ${MONO}`;
-      T(fit(ctx, l.title + (l.paid ? " (lunas)" : ""), IW - 170), X1 + 18, y, `400 20px ${MONO}`, l.paid ? faint : soft);
-      T(fmt(l.amt), X2, y, `400 20px ${MONO}`, l.paid ? faint : soft, "right");
+      const col = l.offset ? green : l.paid ? faint : soft;
+      T(fit(ctx, l.title + (l.paid ? " (lunas)" : ""), IW - 170), X1 + 18, y, `400 20px ${MONO}`, col);
+      T(fmt(l.amt), X2, y, `400 20px ${MONO}`, col, "right");
       y += 30;
     });
     y += 6;
     T("Total", X1 + 18, y, `700 22px ${SANS}`, ink);
     T(fmt(r.due), X2, y, `700 26px ${MONO}`, ink, "right");
     y += 22; dash(y, [3, 7]); y += 46;
+  });
+  (pg.notes || []).forEach(n => {
+    ctx.font = `500 18px ${SANS}`;
+    const out = []; let ln = "";
+    String(n).split(/\s+/).forEach(w => { const t = ln ? ln + " " + w : w; if (ctx.measureText(t).width > IW && ln){ out.push(ln); ln = w; } else ln = t; });
+    if (ln) out.push(ln);
+    out.forEach(t => { T(t, X1, y - 12, `500 18px ${SANS}`, soft); y += 26; });
+    y += 16;
   });
 
   y -= 8;
@@ -976,7 +1038,12 @@ async function saveBlob(blob, name, st){
 }
 async function renderMerge(){
   const tok = ++mergeTok;
-  const m = computeMerge(mergeBills); mergeData = m;
+  const base = computeMerge(mergeBills), net = applyNetting(base);
+  const m = mergeNet && net.pairs.length ? net : base; mergeData = m;
+  $("#mergeNetBox").hidden = !net.pairs.length;
+  $("#mergeNet").checked = mergeNet;
+  $("#mergeNetInfo").textContent = !net.pairs.length ? "" : mergeNet ? net.pairs.map(pairText).join(" ")
+    : "Nonaktif: setiap orang transfer sesuai tagihannya masing-masing, termasuk orang yang saling berutang.";
   const title = mergeTitleNow();
   const isStandalone = typeof standalone !== "undefined" && standalone;
   const canSave = !!downloads || isStandalone;
@@ -987,7 +1054,7 @@ async function renderMerge(){
   $("#mergePages").innerHTML = m.pages.map((pg, i) => `<div class="mpage"><h2>${m.pages.length > 1 ? `${i + 1}/${m.pages.length} · ` : ""}Transfer ke ${esc(pg.to)}</h2>
       <figure class="shot"><img id="mimg-${i}" alt="Tagihan gabungan, dibayar ke ${esc(pg.to)}"></figure>
       ${canSave ? `<button class="primary" data-act="mergeSave" data-i="${i}">${saveLabel}</button>` : ""}</div>`).join("")
-    || `<div class="hempty"><p>Tidak ada yang perlu dibayar: di split yang dipilih, semua orang adalah penerima transfer.</p></div>`;
+    || `<div class="hempty"><p>Tidak ada yang perlu ditransfer: semua tagihan di split yang dipilih sudah lunas atau saling impas.</p></div>`;
   $("#mergeHint").textContent = !m.pages.length ? "" : canSave ? "Atau tekan lama gambar untuk menyimpan, lalu kirim ke grup." : "Tekan lama (atau klik kanan) gambar untuk menyimpan, lalu kirim ke grup.";
   $("#btnMergeShareAll").hidden = true;
   mergeBlobs = [];
@@ -1266,7 +1333,7 @@ document.addEventListener("click", async e => {
     mergeBills = billsCache.filter(x => mergeSel.has(x.id) && x.draft !== true).map(x => JSON.parse(JSON.stringify(x)))
       .sort((x, y) => (new Date(x.date || x.createdAt) - new Date(y.date || y.createdAt)) || ((x.createdAt || 0) - (y.createdAt || 0)));
     if (mergeBills.length < 2) return;
-    $("#mergeTitle").value = defaultMergeTitle(mergeBills);
+    $("#mergeTitle").value = defaultMergeTitle(mergeBills); mergeNet = true;
     $("#mergeStatus").textContent = ""; $("#mergeFallback").hidden = true;
     view = "merge"; show();
   }
@@ -1370,6 +1437,7 @@ document.addEventListener("paste", e => {
 document.addEventListener("change", e => {
   const t = e.target;
   if (t.dataset.act === "mergePick"){ t.checked ? mergeSel.add(t.dataset.id) : mergeSel.delete(t.dataset.id); renderHistory(true); return; }
+  if (t.id === "mergeNet"){ mergeNet = t.checked; renderMerge(); return; }
   if (t.id === "file"){
     scanFile = t.files && t.files[0] || null;
     if (scanFile){ const th = $("#thumb"); if (th.dataset.url) URL.revokeObjectURL(th.dataset.url); th.dataset.url = URL.createObjectURL(scanFile); th.src = th.dataset.url; th.hidden = false; $("#dropText").hidden = true; $("#scanStatus").className = "status"; $("#scanStatus").textContent = "Foto siap. Tekan Baca struk."; }

@@ -17,7 +17,7 @@ Web split bill untuk makan bareng. Masukkan menu dari struk, nama yang ikut maka
 - **Pecah dan gabung porsi.** Item seperti "Es Teh ×5" bisa dipecah jadi 5 porsi untuk orang yang berbeda, lalu digabung lagi kalau perlu.
 - **Gambar hasil bergaya struk thermal** berisi rincian per orang dan rekening tujuan. Di HP, gambar bisa langsung dibagikan ke WhatsApp; di laptop, gambar terunduh sebagai PNG.
 - **Status pembayaran.** Checklist lunas atau belum, plus pesan tagihan otomatis untuk yang belum bayar.
-- **Gabungkan beberapa split.** Dari Riwayat, pilih beberapa split (misalnya semua split dalam satu hari) lalu gabungkan jadi satu tagihan. Total setiap orang dijumlahkan berdasarkan nama, dan tagihan dikelompokkan per penerima transfer: satu gambar untuk setiap penerima.
+- **Gabungkan beberapa split.** Dari Riwayat, pilih beberapa split (misalnya semua split dalam satu hari) lalu gabungkan jadi satu tagihan. Total setiap orang dijumlahkan berdasarkan nama, dan tagihan dikelompokkan per penerima transfer: satu gambar untuk setiap penerima. Orang yang saling berutang cukup membayar selisihnya.
 - **Rekening tersimpan dan riwayat split** di browser pengguna. Split tersimpan otomatis sejak isian pertama, termasuk yang belum selesai.
 
 ## Aturan perhitungan
@@ -33,7 +33,7 @@ Web split bill untuk makan bareng. Masukkan menu dari struk, nama yang ikut maka
 
 **Penerima transfer.** Di langkah Rekening, pilih peserta mana yang menerima transfer. Peserta itu ditandai sebagai **Penerima** dan tidak masuk daftar tagihan. Kalau nama pemilik rekening sama dengan nama peserta (tanpa membedakan huruf besar-kecil), pilihan terisi otomatis. Kalau berbeda, misalnya peserta "Andreas" dan rekening atas nama "Andreas Natanael", pilih manual. Nama pemilik rekening di gambar hasil tetap mengikuti yang diisi, sesuai buku tabungan.
 
-**Tagihan gabungan.** Setiap split dihitung sendiri dulu dengan aturan di atas, lalu nominal per orang dijumlahkan berdasarkan nama (tanpa membedakan huruf besar-kecil) dan dikelompokkan per rekening tujuan. Split yang sudah ditandai lunas untuk seseorang tetap tampil, tapi tidak ikut dijumlahkan.
+**Tagihan gabungan.** Setiap split dihitung sendiri dulu dengan aturan di atas, lalu nominal per orang dijumlahkan berdasarkan nama (tanpa membedakan huruf besar-kecil) dan dikelompokkan per rekening tujuan. Split yang sudah ditandai lunas untuk seseorang tetap tampil, tapi tidak ikut dijumlahkan. Kalau dua orang saling berutang, opsi **Sederhanakan transfer** (aktif secara bawaan) menghitung selisihnya saja: yang utangnya lebih besar mentransfer selisih itu, dan yang lain tidak perlu transfer. Penerima transfer lainnya tidak berubah.
 
 ## Privasi
 
@@ -69,6 +69,13 @@ python -m http.server 8000   # buka http://localhost:8000
 HTML, CSS, dan JavaScript tanpa framework, Canvas API untuk membuat gambar hasil, Web Share API untuk berbagi ke aplikasi chat, dan `localStorage` untuk penyimpanan.
 
 ## Riwayat perubahan
+
+### 1.2.1 (19 Oktober 2026)
+
+**Fitur baru**
+- Opsi "Sederhanakan transfer" di tagihan gabungan, aktif secara bawaan. Kalau dua orang saling berutang, yang dihitung hanya selisihnya: orang dengan utang lebih besar mentransfer selisih itu, dan orang yang lain tidak perlu transfer.
+- Potongan tampil sebagai baris hijau "Potong utang ..." di rincian orang yang membayar. Halaman penerima yang lain memberi catatan siapa yang tidak perlu transfer dan alasannya.
+- Penerima transfer lain tidak berubah, jadi setiap halaman tetap sesuai dengan split asalnya. Opsi ini bisa dimatikan untuk melihat tagihan tanpa potongan.
 
 ### 1.2.0 (19 Oktober 2026)
 
