@@ -4,19 +4,20 @@
 
 Web split bill untuk makan bareng. Masukkan menu dari struk, nama yang ikut makan, lalu pilih siapa pesan apa. Hasilnya berupa gambar ringkasan per orang, lengkap dengan rekening tujuan transfer, yang siap dikirim ke grup. Host bisa mencentang siapa yang sudah bayar dan menyalin pesan tagihan untuk yang belum.
 
-**Demo:** https://bonbon-split-bill-calculator.vercel.app/ 
+**Demo:** https://bonbon-split-bill-calculator.vercel.app/
 
 <!-- Tambahkan screenshot: docs/screenshot.png -->
 
 ## Fitur
 
+- **Halaman utama.** Mulai split baru, lanjutkan split yang belum selesai, atau cek siapa yang belum bayar dari satu halaman.
 - **Input menu dari struk**: nama menu, qty, dan harga, plus pajak, service charge, dan diskon.
 - **Cek total.** Isi total yang tertera di struk, lalu aplikasi memberi tahu apakah hasil hitung sudah cocok atau masih ada selisih (misalnya menu yang terlewat).
 - **Assign menu per orang.** Satu menu bisa dimiliki satu orang, beberapa orang, atau semua (harga dibagi rata).
 - **Pecah dan gabung porsi.** Item seperti "Es Teh ×5" bisa dipecah jadi 5 porsi untuk orang yang berbeda, lalu digabung lagi kalau perlu.
 - **Gambar hasil bergaya struk thermal** berisi rincian per orang dan rekening tujuan. Di HP, gambar bisa langsung dibagikan ke WhatsApp; di laptop, gambar terunduh sebagai PNG.
 - **Status pembayaran.** Checklist lunas atau belum, plus pesan tagihan otomatis untuk yang belum bayar.
-- **Rekening tersimpan dan riwayat split** di browser pengguna.
+- **Rekening tersimpan dan riwayat split** di browser pengguna. Split tersimpan otomatis sejak isian pertama, termasuk yang belum selesai.
 
 ## Aturan perhitungan
 
@@ -65,6 +66,21 @@ python -m http.server 8000   # buka http://localhost:8000
 HTML, CSS, dan JavaScript tanpa framework, Canvas API untuk membuat gambar hasil, Web Share API untuk berbagi ke aplikasi chat, dan `localStorage` untuk penyimpanan.
 
 ## Riwayat perubahan
+
+### 1.1.0 (18 Oktober 2026)
+
+**Fitur baru**
+- Halaman utama saat aplikasi dibuka, berisi tombol buat split baru, daftar split yang belum selesai, dan tiga split terakhir beserta status pembayarannya.
+- Split tersimpan otomatis sejak isian pertama. Split yang belum sampai langkah Hasil muncul di bagian "Belum selesai" dan bisa dilanjutkan dari langkah terakhir.
+- Tombol "Lihat contoh" untuk pengunjung yang belum punya split.
+- Draf yang tidak dipakai bisa dihapus langsung dari halaman utama.
+
+**Perubahan**
+- Aplikasi tidak lagi langsung membuka split terakhir saat dibuka.
+- Tombol Riwayat di header diganti tombol Beranda. Riwayat lengkap dibuka lewat "Lihat semua" di halaman utama.
+- Tombol "Split baru" di langkah Hasil diganti "Selesai", yang kembali ke halaman utama.
+
+**Catatan:** riwayat dari versi sebelumnya tetap terbaca dan muncul di bagian "Split terakhir".
 
 ### 1.0.1 (17 Oktober 2026)
 

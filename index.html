@@ -42,7 +42,7 @@ input,textarea{font-size:16px}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 .bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-block:18px 10px}
-.brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:19px;letter-spacing:-.01em}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:19px;letter-spacing:-.01em;border:0;background:none;padding:0;cursor:pointer;text-align:left;color:inherit}
 .bname{display:flex;flex-direction:column;line-height:1.15}
 .bname small{font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.02em}
 .logo{width:30px;height:30px;border-radius:8px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-family:var(--mono);font-weight:700;font-size:15px}
@@ -181,7 +181,21 @@ textarea.inp{min-height:140px;font-family:var(--mono);font-size:13px}
 .hitem .open b{overflow-wrap:anywhere}
 .hitem .open span{font-size:13px;color:var(--muted)}
 .appver{margin-top:32px;text-align:center;font-family:var(--mono);font-size:12px;color:var(--muted)}
-.hempty{padding:24px;text-align:center;color:var(--muted);background:var(--surface);border:1px dashed var(--line);border-radius:var(--r)}
+.hempty{padding:24px;text-align:center;color:var(--muted);background:var(--surface);border:1px dashed var(--line);border-radius:var(--r);display:flex;flex-direction:column;align-items:center;gap:12px}
+.hempty p{margin:0;max-width:36ch}
+.hempty b{color:var(--ink)}
+.big-new{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;text-align:left;background:var(--accent);color:var(--accent-ink);border:0;border-radius:14px;padding:16px 18px;cursor:pointer}
+.big-new b{font-size:18px;font-weight:800}
+.big-new span{font-size:13px;opacity:.85}
+.big-new:hover{filter:brightness(1.06)}
+.home-lists{display:flex;flex-direction:column;gap:22px;margin-top:4px}
+.hgroup{display:flex;flex-direction:column;gap:10px}
+.hhead{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.hhead h2{margin:0}
+.hitem .open span.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.hitem .tag{white-space:nowrap;flex:none}
+.ghost.sm,.danger.sm{padding:7px 12px;font-size:13.5px;border-radius:9px;flex:none}
+.tag.draft{background:var(--sunk);color:var(--muted);border:1px solid var(--line)}
 
 @media (max-width:440px){
   h1{font-size:23px}
@@ -199,16 +213,24 @@ textarea.inp{min-height:140px;font-family:var(--mono);font-size:13px}
 <body>
 <div class="app">
   <header class="bar">
-    <div class="brand"><span class="logo" aria-hidden="true">÷</span><span class="bname"><span>BonBon</span><small>Split Bill Calculator</small></span></div>
-    <button class="ghost" id="btnHistory" data-act="history">Riwayat</button>
+    <button class="brand" data-act="home" aria-label="BonBon, kembali ke beranda"><span class="logo" aria-hidden="true">÷</span><span class="bname"><span>BonBon</span><small>Split Bill Calculator</small></span></button>
+    <button class="ghost" id="btnHome" data-act="home" hidden>Beranda</button>
   </header>
 
   <nav class="steps" id="steps" aria-label="Langkah"></nav>
   <div class="banner" id="exampleBanner" hidden>Ini contoh isian. Ganti dengan foto struk Anda, atau <button data-act="reset">mulai dari kosong</button></div>
 
   <main>
+    <!-- Beranda -->
+    <section id="sHome">
+      <h1>Halo! Mau bagi tagihan?</h1>
+      <p class="lede">Isi menu dari struk, pilih siapa pesan apa, lalu kirim hasilnya ke grup.</p>
+      <button class="big-new" data-act="newBill"><b>+ Buat split baru</b><span>Mulai dari struk kosong</span></button>
+      <div class="home-lists" id="homeLists"></div>
+    </section>
+
     <!-- 1. Struk -->
-    <section id="s0" data-step="0">
+    <section id="s0" data-step="0" hidden>
       <h1>Foto struk</h1>
       <p class="lede">Unggah foto struk, menu dan harganya akan dibaca otomatis. Periksa hasilnya sebelum lanjut.</p>
       <div class="upload" id="uploadBox">
@@ -230,7 +252,7 @@ textarea.inp{min-height:140px;font-family:var(--mono);font-size:13px}
       </div>
       <label class="field"><span>Total di struk (opsional, untuk cek)</span><input class="inp" id="receiptTotal" inputmode="numeric" placeholder="mis. 196.900" style="font-family:var(--mono);text-align:right"></label>
       <div class="totals" id="totals"></div>
-      <div class="navrow"><button class="primary" data-act="go" data-to="1">Lanjut: siapa yang makan</button></div>
+      <div class="navrow"><button class="ghost" data-act="home">Beranda</button><button class="primary" data-act="go" data-to="1">Lanjut: siapa yang makan</button></div>
     </section>
 
     <!-- 2. Peserta -->
@@ -286,7 +308,7 @@ textarea.inp{min-height:140px;font-family:var(--mono);font-size:13px}
       <p class="status" id="copyStatus" role="status"></p>
       <textarea class="inp" id="copyFallback" readonly hidden aria-label="Teks untuk disalin"></textarea>
       <p class="status" id="saveStatus" role="status"></p>
-      <div class="navrow"><button class="ghost" data-act="go" data-to="3">Kembali</button><button class="ghost" data-act="newBill">Split baru</button></div>
+      <div class="navrow"><button class="ghost" data-act="go" data-to="3">Kembali</button><button class="primary" data-act="home">Selesai</button></div>
     </section>
 
     <!-- Riwayat -->
@@ -294,10 +316,10 @@ textarea.inp{min-height:140px;font-family:var(--mono);font-size:13px}
       <h1>Riwayat</h1>
       <p class="lede" id="histNote"></p>
       <div class="hlist" id="histList"></div>
-      <div class="navrow"><button class="ghost" data-act="go" data-to="0">Kembali ke split</button><button class="primary" data-act="newBill">Split baru</button></div>
+      <div class="navrow"><button class="ghost" data-act="home">Beranda</button><button class="primary" data-act="newBill">Split baru</button></div>
     </section>
   </main>
-  <footer class="appver">BonBon v1.0.1</footer>
+  <footer class="appver">BonBon v1.1.0</footer>
 </div>
 
 <script>
@@ -313,7 +335,7 @@ const STEPS = ["Struk", "Peserta", "Menu", "Rekening", "Hasil"];
 const LS = "bonbon.v1.";
 
 /* ---------- state ---------- */
-function blank(){ return { billId:null, title:"", date:new Date().toISOString(), items:[], tax:0, service:0, discount:0, scannedTotal:null, people:[], payee:null, payeePerson:null, paid:{}, isExample:false }; }
+function blank(){ return { billId:null, title:"", date:new Date().toISOString(), items:[], tax:0, service:0, discount:0, scannedTotal:null, people:[], payee:null, payeePerson:null, paid:{}, isExample:false, draft:true, step:0, createdAt:null, updatedAt:0 }; }
 function example(){
   const s = blank();
   s.isExample = true; s.title = "Warung Sate Pak Kumis (contoh)";
@@ -329,8 +351,8 @@ function example(){
   s.payee = { id:"contoh", owner:"Andi", bank:"BCA", number:"1234567890" };
   return s;
 }
-let state = (() => { const d = lsGet("draft"); return d && Array.isArray(d.items) ? Object.assign(blank(), d) : example(); })();
-let step = 0, view = "steps";
+let state = (() => { const d = lsGet("draft"); return d && Array.isArray(d.items) ? Object.assign(blank(), d) : blank(); })();
+let step = 0, view = "home";
 let accounts = [];
 let db = null, uid = null, sample = null, downloads = null, imgLimits = null;
 let storeMode = "local"; // "account" when db + uid works
@@ -342,10 +364,20 @@ let scanFile = null, lastSavedJSON = null, resultBlob = null;
 
 function lsGet(k){ try { return JSON.parse(localStorage.getItem(LS + k)); } catch(e){ return null; } }
 function lsSet(k, v){ try { localStorage.setItem(LS + k, JSON.stringify(v)); } catch(e){} }
-let draftT = null;
+let draftT = null, saveT = null, dirty = false;
 function touch(fromUser){
-  if (fromUser && state.isExample){ state.isExample = false; $("#exampleBanner").hidden = true; }
+  if (fromUser){
+    if (state.isExample){ state.isExample = false; $("#exampleBanner").hidden = true; }
+    state.updatedAt = Date.now(); dirty = true; scheduleSave();
+  }
   clearTimeout(draftT); draftT = setTimeout(() => lsSet("draft", state), 400);
+}
+// Every split is saved automatically, unfinished ones too, a moment after the last change.
+function scheduleSave(){ clearTimeout(saveT); saveT = setTimeout(() => { if (dirty) saveBill(); }, 1500); }
+function flushSave(){ clearTimeout(saveT); if (dirty) saveBill(); lsSet("draft", state); }
+function hasContent(st){
+  st = st || state;
+  return !!(String(st.title || "").trim() || (st.people || []).length || (st.items || []).some(i => String(i.name || "").trim() || i.price));
 }
 
 /* ---------- write queue (one write at a time per doc) ---------- */
@@ -376,17 +408,19 @@ function persistAccounts(){
 function billsCol(){ return profileRef().collection("bills"); }
 function billBody(){
   const c = calc();
-  return { title: state.title || "Tanpa nama", date: state.date, items: state.items, tax: state.tax, service: state.service, discount: state.discount,
-    scannedTotal: state.scannedTotal, people: state.people, payee: state.payee, payeePerson: state.payeePerson, paid: state.paid, grand: Math.round(c.grand),
+  const isDraft = state.draft === true;
+  return { title: String(state.title || "").trim(), date: state.date, items: state.items, tax: state.tax, service: state.service, discount: state.discount,
+    scannedTotal: state.scannedTotal ?? null, people: state.people, payee: state.payee ?? null, payeePerson: state.payeePerson ?? null, paid: state.paid, grand: Math.round(c.grand),
+    draft: isDraft, step: isDraft ? Math.min(state.step || 0, 3) : 4,
     createdAt: state.createdAt || Date.now(), updatedAt: Date.now() };
 }
 function saveBill(){
-  if (state.isExample || !state.people.length || !state.items.length) { $("#saveStatus").textContent = state.isExample ? "Contoh tidak disimpan ke riwayat." : ""; return; }
+  if (state.isExample || !hasContent()) { $("#saveStatus").textContent = state.isExample ? "Contoh tidak disimpan ke riwayat." : ""; return; }
   if (!state.billId){ state.billId = "b" + Date.now().toString(36) + rid(); state.createdAt = Date.now(); }
   const body = billBody();
   const sig = JSON.stringify(Object.assign({}, body, { updatedAt:0 }));
-  if (sig === lastSavedJSON) return;
-  lastSavedJSON = sig;
+  if (sig === lastSavedJSON){ dirty = false; return; }
+  lastSavedJSON = sig; dirty = false;
   const id = state.billId;
   // local copy always
   const list = (lsGet("bills") || []).filter(b => b.id !== id);
@@ -399,16 +433,18 @@ function saveBill(){
     .catch(e => { lastSavedJSON = null; if (!dropToLocal(e)) { $("#saveStatus").className = "status err"; $("#saveStatus").textContent = "Gagal menyimpan ke akun. Status tetap tersimpan di browser ini."; } });
 }
 async function loadBills(){
+  let list = null;
   if (storeMode === "account"){
-    try { const s = await billsCol().orderBy("createdAt", "desc").limit(100).get(); return s.docs.map(d => Object.assign({ id:d.id }, d.data())); }
+    try { const s = await billsCol().orderBy("createdAt", "desc").limit(100).get(); list = s.docs.map(d => Object.assign({ id:d.id }, d.data())); }
     catch(e){ dropToLocal(e); }
   }
-  return lsGet("bills") || [];
+  if (!list) list = lsGet("bills") || [];
+  return list.slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 }
 async function deleteBill(id){
   lsSet("bills", (lsGet("bills") || []).filter(b => b.id !== id));
   if (storeMode === "account"){ try { await enqueue("bill:" + id, () => billsCol().doc(id).delete()); } catch(e){ dropToLocal(e); } }
-  if (state.billId === id){ state.billId = null; lastSavedJSON = null; }
+  if (state.billId === id){ clearTimeout(saveT); state = blank(); lastSavedJSON = null; dirty = false; lsSet("draft", state); }
 }
 
 /* ---------- math ---------- */
@@ -465,10 +501,18 @@ const isPayee = p => !!p && payeeName() === p;
 function show(){
   document.querySelectorAll("main section").forEach(s => s.hidden = true);
   $("#steps").classList.toggle("hidden-nav", view !== "steps");
-  if (view === "history"){ $("#sH").hidden = false; renderHistory(); return; }
+  $("#btnHome").hidden = view === "home";
+  $("#exampleBanner").hidden = view !== "steps" || !state.isExample;
+  if (view === "home"){ $("#sHome").hidden = false; renderHome(); window.scrollTo({ top:0 }); return; }
+  if (view === "history"){ $("#sH").hidden = false; renderHistory(); window.scrollTo({ top:0 }); return; }
+  if (state.step !== step){
+    // Remember where an unfinished split stopped, so "Lanjutkan" returns there.
+    state.step = step;
+    if (state.draft === true && !state.isExample && hasContent()){ dirty = true; scheduleSave(); }
+    clearTimeout(draftT); draftT = setTimeout(() => lsSet("draft", state), 400);
+  }
   $("#s" + step).hidden = false;
   $("#steps").innerHTML = STEPS.map((t, i) => `<button data-act="go" data-to="${i}" class="${i === step ? "on" : i < step ? "done" : ""}" ${i === step ? 'aria-current="step"' : ""}>${i + 1}. ${t}</button>`).join("");
-  $("#exampleBanner").hidden = !state.isExample;
   [renderStruk, renderPeople, renderAssign, renderAccounts, renderResult][step]();
   window.scrollTo({ top:0 });
 }
@@ -586,6 +630,8 @@ async function renderResult(){
   $("#resultFlags").innerHTML = flags.map(f => `<div class="flag">${f}</div>`).join("");
   renderPaid(c);
   await drawResult(c);
+  // Reaching the result marks the split as finished: it moves from "Belum selesai" to "Split terakhir".
+  if (state.draft === true && !state.isExample && hasContent()) state.draft = false;
   saveBill();
 }
 function renderPaid(c){
@@ -751,24 +797,68 @@ function copy(text, okMsg){
 }
 
 /* ---------- history ---------- */
-let histDel = null;
+let histDel = null, billsCache = [], homeTok = 0, storageReady = false;
+function billStatus(b){
+  if (b.draft === true) return { cls:"draft", text:"Draf" };
+  const pn = payeeName(b);
+  const debt = (b.people || []).filter(p => p !== pn);
+  const paidN = debt.filter(p => b.paid && b.paid[p]).length;
+  if (!debt.length || paidN === debt.length) return { cls:"paid", text:"Lunas" };
+  return { cls:"due", text:`${paidN}/${debt.length} lunas` };
+}
+const billTitle = b => esc(b.title || "Tanpa nama");
+const stepLabel = b => { const s = Math.min(b.step || 0, 3); return `langkah ${s + 1} (${STEPS[s]})`; };
+function delControls(b, label){
+  const id = esc(b.id);
+  return histDel === b.id
+    ? `<button class="danger sm" data-act="delBill" data-id="${id}">Hapus</button><button class="ghost sm" data-act="cancelDel">Batal</button>`
+    : `<button class="x" data-act="askDelBill" data-id="${id}" aria-label="Hapus ${label}">×</button>`;
+}
+function rerenderList(){ view === "home" ? renderHome() : renderHistory(); }
+async function renderHome(){
+  const tok = ++homeTok;
+  const bills = await loadBills();
+  if (tok !== homeTok || view !== "home") return;
+  billsCache = bills;
+  if (!bills.length && !storageReady){ $("#homeLists").innerHTML = `<p class="note">Memuat riwayat…</p>`; return; }
+  const drafts = bills.filter(b => b.draft === true).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  const done = bills.filter(b => b.draft !== true);
+  const all = `<button class="link" data-act="history">Lihat semua →</button>`;
+  let out = "";
+  if (drafts.length){
+    out += `<div class="hgroup"><div class="hhead"><h2>Belum selesai</h2>${done.length ? "" : all}</div><div class="hlist">` +
+      drafts.slice(0, 3).map(b => {
+        const t = billTitle(b), id = esc(b.id);
+        return `<div class="hitem"><button class="open" data-act="openBill" data-id="${id}"><b>${t}</b><span>${(b.people || []).length} orang · berhenti di ${stepLabel(b)}</span></button>` +
+          (histDel === b.id ? delControls(b, t) : `<button class="ghost sm" data-act="openBill" data-id="${id}">Lanjutkan</button>${delControls(b, "draf " + t)}`) + `</div>`;
+      }).join("") + `</div></div>`;
+  }
+  if (done.length){
+    out += `<div class="hgroup"><div class="hhead"><h2>Split terakhir</h2>${all}</div><div class="hlist">` +
+      done.slice(0, 3).map(b => {
+        const st = billStatus(b);
+        const d = new Date(b.date || b.createdAt).toLocaleDateString("id-ID", { day:"numeric", month:"short" });
+        return `<div class="hitem"><button class="open" data-act="openBill" data-id="${esc(b.id)}"><b>${billTitle(b)}</b><span class="mono">${d} · ${fmt(b.grand || 0)}</span></button><span class="tag ${st.cls}">${st.text}</span></div>`;
+      }).join("") + `</div><p class="note">Ketuk split untuk mencentang yang sudah bayar atau menyalin pesan tagihan.</p></div>`;
+  }
+  if (!bills.length) out = `<div class="hempty"><p><b>Belum ada split.</b><br>Tekan "Buat split baru" untuk mulai, atau lihat contoh dulu supaya tahu hasilnya seperti apa.</p><button class="ghost" data-act="example">Lihat contoh</button></div>`;
+  $("#homeLists").innerHTML = out;
+}
 async function renderHistory(){
   renderStoreNotes();
   $("#histList").innerHTML = `<p class="note">Memuat…</p>`;
   const bills = await loadBills();
-  if (!bills.length){ $("#histList").innerHTML = `<div class="hempty">Belum ada riwayat. Split yang sampai ke langkah Hasil akan tersimpan di sini.</div>`; return; }
+  if (view !== "history") return;
+  billsCache = bills;
+  if (!bills.length){ $("#histList").innerHTML = `<div class="hempty"><p>Belum ada riwayat. Split tersimpan otomatis begitu Anda mulai mengisinya.</p></div>`; return; }
   $("#histList").innerHTML = bills.map(b => {
     const ppl = b.people || [];
-    const pn = payeeName(b);
-    const debt = ppl.filter(p => p !== pn);
-    const paidN = debt.filter(p => b.paid && b.paid[p]).length;
+    const st = billStatus(b);
     const d = new Date(b.date || b.createdAt).toLocaleDateString("id-ID", { day:"numeric", month:"short", year:"numeric" });
-    const done = debt.length && paidN === debt.length;
-    return `<div class="hitem"><button class="open" data-act="openBill" data-id="${esc(b.id)}"><b>${esc(b.title)}</b><span>${d} · ${fmt(b.grand || 0)} · ${ppl.length} orang</span></button>
-      <span class="tag ${done ? "paid" : "due"}">${paidN}/${debt.length} lunas</span>
-      ${histDel === b.id ? `<button class="danger" data-act="delBill" data-id="${esc(b.id)}">Hapus?</button>` : `<button class="x" data-act="askDelBill" data-id="${esc(b.id)}" aria-label="Hapus">×</button>`}</div>`;
+    const sub = b.draft === true ? `${d} · ${ppl.length} orang · berhenti di ${stepLabel(b)}` : `${d} · ${fmt(b.grand || 0)} · ${ppl.length} orang`;
+    return `<div class="hitem"><button class="open" data-act="openBill" data-id="${esc(b.id)}"><b>${billTitle(b)}</b><span>${sub}</span></button>` +
+      (histDel === b.id ? "" : `<span class="tag ${st.cls}">${st.text}</span>`) + delControls(b, billTitle(b)) + `</div>`;
   }).join("");
-  renderHistory.cache = bills;
 }
 
 /* ---------- scan ---------- */
@@ -807,7 +897,8 @@ async function scan(){
     state.tax = Math.max(0, Math.round(+r.tax || 0)); state.service = Math.max(0, Math.round(+r.service || 0)); state.discount = Math.max(0, Math.round(+r.discount || 0));
     state.scannedTotal = r.total ? Math.round(+r.total) : null;
     if (r.merchant && !state.title) state.title = String(r.merchant).slice(0, 80);
-    state.date = new Date().toISOString(); state.billId = null; state.paid = {}; lastSavedJSON = null;
+    state.date = new Date().toISOString();
+    if (state.draft !== true){ state.billId = null; state.createdAt = null; state.draft = true; state.paid = {}; lastSavedJSON = null; }
     touch(true);
     renderStruk();
     st.className = "status ok"; st.textContent = `${items.length} menu terbaca. Periksa nama dan harga di bawah.`;
@@ -888,9 +979,12 @@ document.addEventListener("click", async e => {
   const a = b.dataset.act;
   if (a === "who" || a === "paid") return; // handled on change
   if (a === "go"){ step = +b.dataset.to; view = "steps"; show(); }
-  else if (a === "history"){ view = "history"; histDel = null; show(); }
-  else if (a === "reset"){ state = blank(); scanFile = null; resetUpload(); touch(false); show(); }
-  else if (a === "newBill"){ state = blank(); scanFile = null; lastSavedJSON = null; resetUpload(); touch(false); step = 0; view = "steps"; show(); }
+  else if (a === "home"){ flushSave(); view = "home"; histDel = null; show(); }
+  else if (a === "history"){ flushSave(); view = "history"; histDel = null; show(); }
+  else if (a === "reset"){ state = blank(); scanFile = null; lastSavedJSON = null; dirty = false; resetUpload(); touch(false); show(); }
+  else if (a === "newBill"){ flushSave(); state = blank(); scanFile = null; lastSavedJSON = null; dirty = false; resetUpload(); touch(false); step = 0; view = "steps"; show(); }
+  else if (a === "example"){ flushSave(); state = example(); scanFile = null; lastSavedJSON = null; dirty = false; resetUpload(); touch(false); step = 0; view = "steps"; show(); }
+  else if (a === "cancelDel"){ histDel = null; rerenderList(); }
   else if (a === "scan"){ scan(); }
   else if (a === "addItem"){ state.items.push({ id:rid(), name:"", qty:1, price:0, who:[] }); touch(true); renderStruk(); const last = state.items[state.items.length - 1]; $("#n-" + last.id).focus(); }
   else if (a === "delItem"){ const id = b.closest(".irow").dataset.id; state.items = state.items.filter(i => i.id !== id); touch(true); renderStruk(); }
@@ -957,14 +1051,20 @@ document.addEventListener("click", async e => {
     copy(t, "Pesan tagihan tersalin.");
   }
   else if (a === "openBill"){
-    const bill = (renderHistory.cache || []).find(x => x.id === b.dataset.id); if (!bill) return;
-    state = Object.assign(blank(), { billId:bill.id, title:bill.title, date:bill.date, items:bill.items || [], tax:bill.tax || 0, service:bill.service || 0,
-      discount:bill.discount || 0, scannedTotal:bill.scannedTotal || null, people:bill.people || [], payee:bill.payee || null, payeePerson:bill.payeePerson || null, paid:Object.assign({}, bill.paid || {}), createdAt:bill.createdAt });
-    lastSavedJSON = JSON.stringify(Object.assign({}, billBody(), { updatedAt:0 }));
-    touch(false); step = 4; view = "steps"; show();
+    const found = billsCache.find(x => x.id === b.dataset.id); if (!found) return;
+    const bill = JSON.parse(JSON.stringify(found)); // stored copies can be read-only; edit a private copy
+    flushSave();
+    const isDraft = bill.draft === true;
+    state = Object.assign(blank(), { billId:bill.id, title: bill.title === "Tanpa nama" ? "" : (bill.title || ""), date:bill.date || new Date().toISOString(),
+      items:bill.items || [], tax:bill.tax || 0, service:bill.service || 0, discount:bill.discount || 0, scannedTotal:bill.scannedTotal || null,
+      people:bill.people || [], payee:bill.payee || null, payeePerson:bill.payeePerson || null, paid:bill.paid || {},
+      draft:isDraft, step: isDraft ? Math.min(bill.step || 0, 3) : 4, createdAt:bill.createdAt || Date.now(), updatedAt:bill.updatedAt || 0 });
+    scanFile = null; resetUpload(); histDel = null;
+    lastSavedJSON = JSON.stringify(Object.assign({}, billBody(), { updatedAt:0 })); dirty = false;
+    touch(false); step = state.step; view = "steps"; show();
   }
-  else if (a === "askDelBill"){ histDel = b.dataset.id; renderHistory(); }
-  else if (a === "delBill"){ const id = b.dataset.id; histDel = null; await deleteBill(id); renderHistory(); }
+  else if (a === "askDelBill"){ histDel = b.dataset.id; rerenderList(); }
+  else if (a === "delBill"){ const id = b.dataset.id; histDel = null; await deleteBill(id); rerenderList(); }
 });
 document.addEventListener("keydown", e => {
   if (e.key === "Enter" && e.target.id === "personInput"){ e.preventDefault(); $("[data-act=addPerson]").click(); }
@@ -1028,10 +1128,20 @@ $("#accForm").addEventListener("submit", e => {
 function resetUpload(){ $("#file").value = ""; const th = $("#thumb"); th.hidden = true; th.removeAttribute("src"); $("#dropText").hidden = false; $("#scanStatus").textContent = ""; $("#btnScan").disabled = true; }
 
 /* ---------- boot ---------- */
+// The last open split may hold edits that were not saved yet (for example, the tab closed right after typing).
+async function reconcileDraft(){
+  if (state.isExample || !hasContent()) return;
+  const bills = await loadBills();
+  const saved = state.billId ? bills.find(b => b.id === state.billId) : null;
+  if (state.billId && !saved && !(lsGet("bills") || []).some(b => b.id === state.billId)){ state = blank(); lsSet("draft", state); return; }
+  if (!saved || (state.updatedAt || 0) > (saved.updatedAt || 0)){ lastSavedJSON = null; saveBill(); }
+}
+async function afterStorageReady(){ await reconcileDraft(); storageReady = true; if (view === "home") renderHome(); }
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") flushSave(); });
 show();
 (async () => {
   const c = window.claude;
-  if (!c || !c.use){ if (SCAN_ENABLED) await setupServerScan(); else manualOnly(); renderStoreNotes(); if (view === "steps" && step === 4) show(); return; }
+  if (!c || !c.use){ if (SCAN_ENABLED) await setupServerScan(); else manualOnly(); renderStoreNotes(); await afterStorageReady(); if (view === "steps" && step === 4) show(); return; }
   const [u, d, s, dl] = await Promise.all(["user", "db", "sample", "downloads"].map(n => c.use(n).catch(() => null)));
   downloads = dl;
   if (s){ sample = s; try { const lim = await s.limits(); imgLimits = lim && lim.images || null; } catch(e){ imgLimits = null; }
@@ -1040,6 +1150,7 @@ show();
   if (u && d){ try { uid = await u.id(); } catch(e){ uid = null; } if (uid){ db = d; storeMode = "account"; } }
   await loadAccounts();
   renderStoreNotes();
+  await afterStorageReady();
   if (view === "steps" && (step === 3 || step === 4)) show();
   if (view === "steps" && step === 4) $("#btnSaveImg").hidden = !downloads;
 })();
