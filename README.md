@@ -11,7 +11,7 @@ Web split bill untuk makan bareng. Masukkan menu dari struk, nama yang ikut maka
 ## Fitur
 
 - **Halaman utama.** Mulai split baru, lanjutkan split yang belum selesai, atau cek siapa yang belum bayar dari satu halaman.
-- **Input menu dari struk**: nama menu, qty, dan harga, plus pajak, service charge, dan diskon. Harga bisa diisi sebagai total per baris atau harga satuan (total per baris dihitung otomatis dari qty × harga). Setiap menu wajib punya nama dan harga, dan angka yang formatnya salah ditolak dengan pesan.
+- **Input menu dari struk**: nama menu, qty, dan harga, plus pajak, service charge, dan diskon. Harga bisa diisi sebagai subtotal atau harga satuan (subtotal dihitung otomatis dari qty × harga). Setiap menu wajib punya nama dan harga, dan angka yang formatnya salah ditolak dengan pesan.
 - **Cek total.** Isi total yang tertera di struk, lalu aplikasi memberi tahu apakah hasil hitung sudah cocok atau masih ada selisih (misalnya menu yang terlewat).
 - **Assign menu per orang.** Satu menu bisa dimiliki satu orang, beberapa orang, atau semua (harga dibagi rata).
 - **Isi jumlah per orang.** Menu dengan qty lebih dari 1, misalnya sate 20 tusuk, bisa dibagi sesuai jumlah yang diambil tiap orang (Nb 5, Nico 10, Theo 5). Jumlahnya bisa diketik atau diatur dengan tombol − dan +, termasuk pecahan seperti 0,5 atau 1/3. Sisa yang belum dibagi ditandai sebelum hasil dibuat.
@@ -70,6 +70,15 @@ python -m http.server 8000   # buka http://localhost:8000
 HTML, CSS, dan JavaScript tanpa framework, Canvas API untuk membuat gambar hasil, Web Share API untuk berbagi ke aplikasi chat, dan `localStorage` untuk penyimpanan.
 
 ## Riwayat perubahan
+
+### 1.3.1 (22 Oktober 2026)
+
+**Perbaikan**
+- Pindah antara "Subtotal" dan "Harga satuan" sekarang mengonversi angkanya: subtotal ÷ qty jadi harga per item, dan harga per item × qty jadi subtotal. Subtotal setiap menu tidak berubah. Sebelumnya angka yang sudah diketik tetap dan hanya artinya yang berubah.
+- Kalau subtotal tidak habis dibagi qty, harga per item ditampilkan dibulatkan (misalnya 10.000 ÷ 3 = 3.333), tapi subtotalnya tetap 10.000 selama angkanya tidak diketik ulang.
+
+**Tampilan**
+- Pilihan "Total per baris" diganti "Subtotal", termasuk judul kolomnya.
 
 ### 1.3.0 (22 Oktober 2026)
 

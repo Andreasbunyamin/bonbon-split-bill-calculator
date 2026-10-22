@@ -284,7 +284,7 @@ textarea.inp{min-height:140px;font-family:var(--mono);font-size:13px}
       <div class="price-mode" id="priceMode">
         <span id="priceModeLabel">Harga yang diisi</span>
         <div class="seg" role="radiogroup" aria-labelledby="priceModeLabel">
-          <button type="button" role="radio" aria-checked="true" data-act="priceMode" data-mode="total">Total per baris</button>
+          <button type="button" role="radio" aria-checked="true" data-act="priceMode" data-mode="total">Subtotal</button>
           <button type="button" role="radio" aria-checked="false" data-act="priceMode" data-mode="unit">Harga satuan</button>
         </div>
         <p class="note" id="priceHint"></p>
@@ -395,7 +395,7 @@ textarea.inp{min-height:140px;font-family:var(--mono);font-size:13px}
       <div class="navrow"><button class="ghost" data-act="mergeBack">Kembali</button><button class="primary" data-act="home">Selesai</button></div>
     </section>
   </main>
-  <footer class="appver">BonBon v1.3.0</footer>
+  <footer class="appver">BonBon v1.3.1</footer>
 </div>
 
 <script>
@@ -809,8 +809,8 @@ function renderPriceMode(){
   const m = state.priceMode === "unit" ? "unit" : "total";
   document.querySelectorAll("#priceMode [data-mode]").forEach(b => b.setAttribute("aria-checked", String(b.dataset.mode === m)));
   $("#priceHint").textContent = m === "unit"
-    ? "Isi harga satu item. Total per baris dihitung otomatis: qty × harga."
-    : "Isi total per baris (qty × harga satuan), biasanya angka paling kanan di struk.";
+    ? "Isi harga satu item. Subtotal dihitung otomatis: qty × harga."
+    : "Isi subtotal tiap menu (qty × harga satuan), biasanya angka paling kanan di struk.";
 }
 function renderStruk(){
   $("#title").value = state.title;
@@ -822,11 +822,11 @@ function renderStruk(){
     <div class="irow" data-id="${it.id}">
       <input id="n-${it.id}" data-f="name" value="${esc(it.name)}" placeholder="Nama menu" aria-label="Nama menu" aria-describedby="m-${it.id}">
       <input id="q-${it.id}" data-f="qty" class="num" inputmode="numeric" pattern="[0-9]*" value="${it.qty}" aria-label="Jumlah" aria-describedby="m-${it.id}">
-      <input id="p-${it.id}" data-f="price" class="num" inputmode="numeric" value="${shownPrice(it)}" placeholder="0" aria-label="${unit ? "Harga satuan" : "Harga total"}" aria-describedby="m-${it.id}">
+      <input id="p-${it.id}" data-f="price" class="num" inputmode="numeric" value="${shownPrice(it)}" placeholder="0" aria-label="${unit ? "Harga satuan" : "Subtotal"}" aria-describedby="m-${it.id}">
       <button class="x" data-act="delItem" aria-label="Hapus ${esc(it.name)}">×</button>
       <p class="inote" id="m-${it.id}"></p>
     </div>`).join("");
-  $("#items").innerHTML = `<div class="ihead"><span>Menu</span><span class="num">Qty</span><span class="num">${unit ? "Harga/item" : "Total"}</span><span></span></div>` +
+  $("#items").innerHTML = `<div class="ihead"><span>Menu</span><span class="num">Qty</span><span class="num">${unit ? "Harga/item" : "Subtotal"}</span><span></span></div>` +
     (rows || `<div class="empty-items">Belum ada menu. Tekan "+ Tambah menu" di bawah.</div>`);
   state.items.forEach(paintRow);
   renderPriceMode(); renderItemsFlag(); paintMoneyErr();
@@ -1603,8 +1603,7 @@ document.addEventListener("click", async e => {
   else if (a === "priceMode"){
     const m = b.dataset.mode === "unit" ? "unit" : "total";
     if ((state.priceMode === "unit" ? "unit" : "total") !== m){
-      // The typed numbers stay as they are and only their meaning changes, so a wrong choice is fixed for every row at once.
-      state.items.forEach(it => { if (it.qty > 1 && it.price > 0) it.price = m === "unit" ? Math.min(it.price * it.qty, MONEY_MAX) : Math.round(it.price / it.qty); });
+      // Each menu keeps its subtotal: the field switches between subtotal ÷ qty (price of one item) and price × qty.
       state.priceMode = m; touch(true);
     }
     renderStruk();
