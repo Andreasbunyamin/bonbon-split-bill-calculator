@@ -14,7 +14,7 @@ Web split bill untuk makan bareng. Masukkan menu dari struk, nama yang ikut maka
 - **Input menu dari struk**: nama menu, qty, dan harga, plus pajak, service charge, dan diskon. Harga bisa diisi sebagai total per baris atau harga satuan (total per baris dihitung otomatis dari qty × harga). Setiap menu wajib punya nama dan harga, dan angka yang formatnya salah ditolak dengan pesan.
 - **Cek total.** Isi total yang tertera di struk, lalu aplikasi memberi tahu apakah hasil hitung sudah cocok atau masih ada selisih (misalnya menu yang terlewat).
 - **Assign menu per orang.** Satu menu bisa dimiliki satu orang, beberapa orang, atau semua (harga dibagi rata).
-- **Pecah dan gabung porsi.** Item seperti "Es Teh ×5" bisa dipecah jadi 5 porsi untuk orang yang berbeda, lalu digabung lagi kalau perlu.
+- **Isi jumlah per orang.** Menu dengan qty lebih dari 1, misalnya sate 20 tusuk, bisa dibagi sesuai jumlah yang diambil tiap orang (Nb 5, Nico 10, Theo 5). Jumlahnya bisa diketik atau diatur dengan tombol − dan +, termasuk pecahan seperti 0,5 atau 1/3. Sisa yang belum dibagi ditandai sebelum hasil dibuat.
 - **Gambar hasil bergaya struk thermal** berisi rincian per orang dan rekening tujuan. Di HP, gambar bisa langsung dibagikan ke WhatsApp; di laptop, gambar terunduh sebagai PNG.
 - **Status pembayaran.** Checklist lunas atau belum, plus pesan tagihan otomatis untuk yang belum bayar.
 - **Gabungkan beberapa split.** Dari Riwayat, pilih beberapa split (misalnya semua split dalam satu hari) lalu gabungkan jadi satu tagihan. Total setiap orang dijumlahkan berdasarkan nama, dan tagihan dikelompokkan per penerima transfer: satu gambar untuk setiap penerima. Orang yang saling berutang cukup membayar selisihnya.
@@ -26,6 +26,7 @@ Web split bill untuk makan bareng. Masukkan menu dari struk, nama yang ikut maka
 |---|---|
 | Menu milik satu orang | Ditanggung orang itu |
 | Menu sharing | Dibagi rata ke orang yang dipilih |
+| Menu dengan jumlah per orang | Harga menu × jumlah yang diambil ÷ qty. Nominal setiap orang dibulatkan ke bawah ke rupiah, lalu sisa rupiahnya diberikan satu per satu ke pecahan terbesar (kalau sama, ke nama paling atas), jadi jumlahnya pas dengan harga menu |
 | Pajak | Dibagi proporsional sesuai nilai pesanan masing-masing |
 | Service | Pilih per split: **rata per orang** (cocok untuk ongkos kirim atau biaya layanan aplikasi seperti GrabFood) atau **proporsional** sesuai nilai pesanan (cocok untuk service charge restoran). Bawaannya rata. |
 | Diskon | Dibagi proporsional sesuai nilai pesanan masing-masing (yang pesan lebih banyak, potongannya lebih besar) |
@@ -69,6 +70,23 @@ python -m http.server 8000   # buka http://localhost:8000
 HTML, CSS, dan JavaScript tanpa framework, Canvas API untuk membuat gambar hasil, Web Share API untuk berbagi ke aplikasi chat, dan `localStorage` untuk penyimpanan.
 
 ## Riwayat perubahan
+
+### 1.3.0 (22 Oktober 2026)
+
+**Fitur baru**
+- "Isi jumlah per orang" di langkah Menu, untuk menu dengan qty lebih dari 1. Setiap peserta punya tombol − dan + yang angkanya juga bisa diketik, dan nominalnya langsung terhitung. Contohnya sate 20 tusuk: Nb 5, Nico 10, Theo 5.
+- Jumlah bisa berupa pecahan: 0,5, 1/3, atau 1 1/2. Angka seperti 0,33 dibaca 1/3, jadi tiga orang yang masing-masing mengisi 0,33 pas membagi satu porsi.
+- Nominal per orang dibulatkan ke rupiah dan jumlahnya selalu pas dengan harga menu. Contohnya Rp10.000 dibagi 1/6 ke enam orang: empat orang Rp1.667 dan dua orang Rp1.666.
+- Total jumlah tidak bisa melebihi qty. Kalau masih kurang, kartu menu ditandai oranye "Sisa … belum dibagi", dan sisanya ikut muncul di peringatan di langkah Hasil.
+- "Bagi rata saja" kembali ke pilihan nama. Pilihan nama dan jumlah per orang sama-sama tetap tersimpan saat berpindah.
+
+**Perubahan**
+- "Pecah jadi N porsi" dan "Gabungkan lagi" dihapus, digantikan "Isi jumlah per orang". Untuk membagi porsi tertentu ke kelompok yang berbeda (misalnya 2 pizza untuk 2 kelompok), masukkan sebagai 2 baris di langkah Struk.
+- Langkah Struk selalu menampilkan satu baris per menu, sama seperti di struk.
+- Qty di langkah Struk tidak bisa dikurangi di bawah jumlah yang sudah dibagi di langkah Menu.
+- Gambar hasil dan teks WhatsApp menulis jumlahnya, misalnya "Sate Daging Ayam / Tusuk ×10".
+
+**Catatan:** split lama yang sudah dipecah per porsi dikonversi otomatis jadi jumlah per orang, dan porsi yang dimiliki beberapa orang dihitung sebagai pecahan (misalnya 1/2 untuk dua orang). Nominal per orang tetap sama; paling-paling bergeser Rp1 antarorang kalau harga per porsinya tidak bulat.
 
 ### 1.2.2 (19 Oktober 2026)
 

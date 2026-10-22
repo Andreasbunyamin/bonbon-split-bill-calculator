@@ -148,9 +148,22 @@ h2{font-size:17px;font-weight:700;margin:8px 0 0}
 .pills .sep{width:1px;align-self:stretch;background:var(--line);margin-inline:2px}
 .afoot{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
 .afoot b{color:var(--ink);font-family:var(--mono);font-weight:600}
-.ptag{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--accent);background:var(--accent-soft);border-radius:6px;padding:1px 7px;margin-left:6px;white-space:nowrap}
-.acard.part{border-left:3px solid var(--accent)}
-.mconf{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center;color:var(--warn);font-size:13px;max-width:100%}
+.cnt{display:flex;flex-direction:column;gap:6px}
+.crow{display:grid;grid-template-columns:minmax(0,1fr) auto 96px;gap:10px;align-items:center}
+.crow .cn{font-weight:600;min-width:0;overflow-wrap:anywhere}
+.crow .ca{font-family:var(--mono);font-weight:600;text-align:right;font-variant-numeric:tabular-nums}
+.crow .ca.zero{color:var(--muted);font-weight:400}
+.stepper{display:inline-grid;grid-template-columns:36px 58px 36px;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface)}
+.stepper .sb{border:0;background:var(--sunk);color:var(--accent);font-size:19px;font-weight:600;line-height:1;height:36px;padding:0;cursor:pointer}
+.stepper .sb:disabled{color:var(--line);cursor:default}
+.stepper .cv{border:0;border-inline:1px solid var(--line);width:100%;min-width:0;padding:0 2px;text-align:center;font-family:var(--mono);font-size:15px;font-weight:600;color:var(--ink);background:var(--surface)}
+.stepper .cv:focus{outline:2px solid var(--accent);outline-offset:-2px}
+.stepper .cv.zero{color:var(--muted);font-weight:400}
+.stepper .cv.bad,.stepper .cv.bad:focus{outline:2px solid var(--danger);outline-offset:-2px}
+.pstat.ok{color:var(--accent);font-weight:600}
+.pstat.warn{color:var(--warn);font-weight:600}
+.perr{margin:0;font-size:13px;color:var(--danger)}
+.perr:empty{display:none}
 .flag{background:var(--warn-soft);color:var(--warn);border-radius:10px;padding:10px 14px;font-size:14px;font-weight:500}
 
 .accs{display:flex;flex-direction:column;gap:8px}
@@ -311,7 +324,7 @@ textarea.inp{min-height:140px;font-family:var(--mono);font-size:13px}
     <!-- 3. Menu -->
     <section id="s2" data-step="2" hidden>
       <h1>Siapa pesan apa?</h1>
-      <p class="lede">Pilih nama untuk tiap menu. Kalau dipilih lebih dari satu orang, harganya dibagi rata.</p>
+      <p class="lede">Pilih nama untuk tiap menu. Kalau dipilih lebih dari satu orang, harganya dibagi rata. Menu dengan qty lebih dari 1 juga bisa dibagi sesuai jumlah yang diambil tiap orang.</p>
       <div id="assignFlag"></div>
       <div class="acards" id="assign"></div>
       <div class="navrow"><button class="ghost" data-act="go" data-to="1">Kembali</button><button class="primary" data-act="go" data-to="3">Lanjut: bayar ke siapa</button></div>
@@ -382,7 +395,7 @@ textarea.inp{min-height:140px;font-family:var(--mono);font-size:13px}
       <div class="navrow"><button class="ghost" data-act="mergeBack">Kembali</button><button class="primary" data-act="home">Selesai</button></div>
     </section>
   </main>
-  <footer class="appver">BonBon v1.2.2</footer>
+  <footer class="appver">BonBon v1.3.0</footer>
 </div>
 
 <script>
@@ -433,6 +446,76 @@ function parseMoney(v, kind){
   if (n > MONEY_MAX) return { ok:false, msg:`${label} terlalu besar.` };
   return { ok:true, value:n };
 }
+// Counts per person ("Isi jumlah per orang") are exact fractions [numerator, denominator], so thirds and sixths add
+// up exactly: 1/3 + 1/3 + 1/3 is 1, not 0,99.
+const gcd = (a, b) => b ? gcd(b, a % b) : Math.abs(a);
+const frac = (n, d) => { if (!d) return [0, 1]; const g = gcd(n, d) || 1; return [n / g, d / g]; };
+const fAdd = (a, b) => frac(a[0] * b[1] + b[0] * a[1], a[1] * b[1]);
+const fSub = (a, b) => frac(a[0] * b[1] - b[0] * a[1], a[1] * b[1]);
+const fCmp = (a, b) => a[0] * b[1] - b[0] * a[1];
+const fMin = (a, b) => fCmp(a, b) <= 0 ? a : b;
+const isFrac = v => Array.isArray(v) && v.length === 2 && Number.isInteger(v[0]) && Number.isInteger(v[1]) && v[0] >= 0 && v[1] > 0;
+// 5, 0,5, 1,25, 1/3 or 1 1/2. A short decimal that is a simple fraction rounded (0,33 or 0,17) is read as that
+// fraction, so three people typing 0,33 share exactly one.
+function parsePcs(v){
+  const s = String(v ?? "").trim().replace(/\s+/g, " ").replace(/[.,]$/, "");
+  if (!s) return { ok:true, value:[0, 1] };
+  if (/^[-−]/.test(s)) return { ok:false, msg:"Jumlah tidak bisa minus." };
+  if (/^\d+$/.test(s)) return { ok:true, value:[parseInt(s, 10), 1] };
+  let m = s.match(/^(?:(\d+) )?(\d+)\/(\d+)$/);
+  if (m){
+    const b = +m[3];
+    if (!b || b > 100) return { ok:false, msg:"Pecahannya tidak dikenali. Tulis misalnya 1/3 atau 1 1/2." };
+    return { ok:true, value:frac(+(m[1] || 0) * b + +m[2], b) };
+  }
+  m = s.match(/^(\d*)[.,](\d{1,3})$/);
+  if (m){
+    const x = parseFloat((m[1] || "0") + "." + m[2]);
+    for (let d = 1; d <= 12; d++){ const n = Math.round(x * d); if (Math.abs(x - n / d) < 0.0051) return { ok:true, value:frac(n, d) }; }
+    return { ok:true, value:frac(Math.round(x * 100), 100) };
+  }
+  // Half-typed values such as "1/" or "1 1" are judged only when the field is left.
+  if (/^(\d+ )?\d*\/$|^\d+ \d+$/.test(s)) return { ok:false, soft:true, msg:"Jumlahnya belum lengkap. Tulis misalnya 2, 0,5 atau 1/3." };
+  return { ok:false, msg:"Isi jumlah dengan angka, misalnya 2, 0,5 atau 1/3." };
+}
+// Whole numbers as they are, halves and quarters as decimals (0,5 and 1,25), other fractions as 1/3 or 1 1/3.
+function pcsText(v){
+  const n = v[0], d = v[1];
+  if (d === 1) return String(n);
+  if (100 % d === 0) return (n / d).toLocaleString("id-ID", { maximumFractionDigits:2 });
+  const w = Math.floor(n / d), r = n - w * d;
+  return w ? `${w} ${r}/${d}` : `${r}/${d}`;
+}
+const isPcs = it => !!it && it.mode === "pcs";
+const pcsOf = (it, p) => it.pcs && isFrac(it.pcs[p]) ? it.pcs[p] : [0, 1];
+const pcsSum = it => state.people.reduce((s, p) => fAdd(s, pcsOf(it, p)), [0, 1]);
+// Each person pays price × count ÷ qty, in whole rupiah that add up to exactly what has been shared out: everyone is
+// rounded down, then the leftover rupiah go one each to the largest fractions, on a tie to whoever is listed first.
+function pcsSplit(it){
+  const qty = Math.max(1, it.qty || 1), price = Math.max(0, it.price || 0), sum = pcsSum(it);
+  const rows = state.people.map((p, k) => {
+    const v = pcsOf(it, p), raw = price * v[0] / (v[1] * qty), amt = Math.floor(raw + 1e-7);
+    return { p, k, v, amt, fr: Math.round((raw - amt) * 1e6) };
+  });
+  const shared = Math.round(price * sum[0] / (sum[1] * qty) + 1e-7);
+  let left = shared - rows.reduce((s, r) => s + r.amt, 0);
+  rows.filter(r => r.v[0]).sort((a, b) => b.fr - a.fr || a.k - b.k).forEach(r => { if (left > 0){ r.amt++; left--; } });
+  return { rows, sum, rest: fSub([qty, 1], sum), shared, restAmt: price - shared };
+}
+// Splits saved before v1.3.0 kept a menu "pecah jadi N porsi" as separate rows (grp, part, of). Each group becomes one
+// row again with a count per person; a portion shared by k people counts 1/k for each of them.
+function migrateItems(items){
+  const out = [], groups = {};
+  (items || []).forEach(it => {
+    if (!it || !it.grp){ out.push(it); return; }
+    let g = groups[it.grp];
+    if (!g){ g = groups[it.grp] = { id:it.id, name:it.name, qty:0, price:0, who:[], mode:"pcs", pcs:{} }; out.push(g); }
+    g.qty += 1; g.price += it.price || 0;
+    const who = (it.who || []).filter(Boolean);
+    who.forEach(w => { g.pcs[w] = fAdd(isFrac(g.pcs[w]) ? g.pcs[w] : [0, 1], [1, who.length]); if (!g.who.includes(w)) g.who.push(w); });
+  });
+  return out;
+}
 const fmtN = n => Math.round(n).toLocaleString("id-ID");
 const fmt = n => (n < 0 ? "-Rp" : "Rp") + fmtN(Math.abs(n));
 const rid = () => Math.random().toString(36).slice(2, 9);
@@ -457,7 +540,7 @@ function example(){
   s.payee = { id:"contoh", owner:"Andi", bank:"BCA", number:"1234567890" };
   return s;
 }
-let state = (() => { const d = lsGet("draft"); return d && Array.isArray(d.items) ? Object.assign(blank(), d) : blank(); })();
+let state = (() => { const d = lsGet("draft"); if (!d || !Array.isArray(d.items)) return blank(); const s = Object.assign(blank(), d); s.items = migrateItems(s.items); return s; })();
 let step = 0, view = "home";
 let accounts = [];
 let db = null, uid = null, sample = null, downloads = null, imgLimits = null;
@@ -556,24 +639,25 @@ async function deleteBill(id){
 /* ---------- math ---------- */
 const svcProp = () => state.serviceMode === "proporsional";
 function calc(){
+  if (state.items.some(it => it && it.grp)) state.items = migrateItems(state.items);
   const per = {}; state.people.forEach(p => per[p] = { items:[], sub:0 });
   const unassigned = []; let itemsTotal = 0;
   state.items.forEach(it => {
     if (!(it.price > 0)) return; // a row without a price has nothing to split
     itemsTotal += it.price;
+    if (isPcs(it)){
+      // Counted per person: each line reads "Sate Daging Ayam ×10"; what is not counted yet is reported as unassigned.
+      const s = pcsSplit(it);
+      if (fCmp(s.sum, [Math.max(1, it.qty || 1), 1]) > 0){ unassigned.push(it); return; } // more counted than the qty: nothing is charged until it is fixed
+      s.rows.forEach(r => { if (!r.v[0]) return; per[r.p].sub += r.amt; per[r.p].items.push({ name:`${it.name} ×${pcsText(r.v)}`, qty:1, share:r.amt, n:1 }); });
+      if (fCmp(s.rest, [0, 1]) > 0) unassigned.push(s.sum[0] ? Object.assign({}, it, { rest:s.rest }) : it);
+      return;
+    }
     const who = (it.who || []).filter(w => per[w]);
     if (!who.length){ unassigned.push(it); return; }
     const share = it.price / who.length;
     who.forEach(w => {
       per[w].sub += share;
-      if (it.grp){
-        // portions of one split item: show as one line per person, e.g. "Es Teh (2 dari 5)"
-        const key = it.grp + "|" + who.length;
-        const ex = per[w].items.find(x => x.key === key);
-        if (ex){ ex.cnt++; ex.share += share; ex.name = `${it.name} (${ex.cnt} dari ${it.of})`; return; }
-        per[w].items.push({ key, cnt:1, name:`${it.name} (1 dari ${it.of})`, qty:1, share, n:who.length });
-        return;
-      }
       per[w].items.push({ name:it.name, qty:it.qty, share, n:who.length });
     });
   });
@@ -637,8 +721,8 @@ function renderSvcMode(){
 }
 /* ---------- menu rows: price mode, input checks, complete rows ---------- */
 // Messages belong to one split and reset by themselves when another split is opened.
-let ui = { st:null, rowErr:{}, moneyErr:{}, checked:false, held:false, rejectedAt:0 };
-function uiFor(){ if (ui.st !== state) ui = { st:state, rowErr:{}, moneyErr:{}, checked:false, held:false, rejectedAt:0 }; return ui; }
+let ui = { st:null, rowErr:{}, moneyErr:{}, pcsErr:{}, checked:false, held:false, rejectedAt:0 };
+function uiFor(){ if (ui.st !== state) ui = { st:state, rowErr:{}, moneyErr:{}, pcsErr:{}, checked:false, held:false, rejectedAt:0 }; return ui; }
 const itemName = it => String(it.name || "").trim();
 const rowErrOf = it => { const u = uiFor(); return u.rowErr[it.id] || (u.rowErr[it.id] = {}); };
 // A row with nothing typed in it is not a problem: it is dropped when moving on. A row still showing a rejected value is kept.
@@ -662,6 +746,13 @@ function setQty(it, n){
   if (state.priceMode === "unit" && it.price > 0) it.price = Math.min(Math.round(it.price / it.qty) * n, MONEY_MAX);
   it.qty = n;
 }
+// A qty is valid when it is a whole number from 1 to 999 and not below what is already counted per person.
+function qtyCheck(it, text){
+  const r = parseQty(text);
+  if (!r.ok || !isPcs(it)) return r;
+  const min = pcsSum(it);
+  return fCmp([r.value, 1], min) < 0 ? { ok:false, msg:`Qty tidak bisa kurang dari jumlah yang sudah dibagi di langkah Menu (${pcsText(min)}).` } : r;
+}
 function paintRow(it){
   const row = document.querySelector(`.irow[data-id="${it.id}"]`); if (!row) return;
   const e = rowErrOf(it), errs = [e.qty, e.price].filter(Boolean);
@@ -672,7 +763,7 @@ function paintRow(it){
   note.classList.toggle("err", !!(errs.length || prob));
   // The outline marks what still needs fixing: a value being typed that cannot be used, or what "Lanjut" found missing.
   const qEl = row.querySelector("[data-f=qty]"), pEl = row.querySelector("[data-f=price]"), pr = parseMoney(pEl.value, "price");
-  const qLive = !!qEl.value.trim() && !parseQty(qEl.value).ok, pLive = !pr.ok && !pr.soft;
+  const qLive = !!qEl.value.trim() && !qtyCheck(it, qEl.value).ok, pLive = !pr.ok && !pr.soft;
   row.classList.toggle("bad", !!prob || qLive || pLive);
   const mark = (f, on) => { const el = row.querySelector(`[data-f=${f}]`); el.classList.toggle("bad", on); el.setAttribute("aria-invalid", String(on)); };
   mark("name", !!prob && !itemName(it));
@@ -763,34 +854,62 @@ function renderPeople(){
   setTimeout(() => $("#personInput").focus(), 0);
 }
 
+function assignFlagHtml(c){ return c.unassigned.length ? `<div class="flag">${c.unassigned.length} menu belum ada pemiliknya.</div>` : ""; }
 function renderAssign(){
   if (!state.people.length){ $("#assignFlag").innerHTML = `<div class="flag">Tambahkan nama dulu di langkah Peserta.</div>`; $("#assign").innerHTML = ""; return; }
   const c = calc();
-  $("#assignFlag").innerHTML = c.unassigned.length ? `<div class="flag">${c.unassigned.length} menu belum ada pemiliknya.</div>` : "";
-  $("#assign").innerHTML = state.items.map((it, i) => {
-    if (!(it.price > 0)) return ""; // nothing to split
-    const who = (it.who || []).filter(w => state.people.includes(w));
-    const all = who.length === state.people.length;
-    const pills = state.people.map((p, pi) => {
-      const on = who.includes(p);
-      return `<label class="pill ${on ? "on" : ""}"><input type="checkbox" id="w-${it.id}-${pi}" data-act="who" data-i="${i}" data-pi="${pi}" ${on ? "checked" : ""}>${esc(p)}</label>`;
-    }).join("");
-    const firstG = it.grp && state.items.findIndex(x => x.grp === it.grp) === i;
-    let ctl = "";
-    if (firstG){
-      ctl = pendingMerge === it.grp
-        ? `<span class="mconf">Porsi ini dimiliki orang berbeda. Kalau digabung, harganya dibagi rata ke semuanya. <button class="link" data-act="mergeConfirm" data-g="${it.grp}">Tetap gabung</button><button class="link" data-act="cancelMerge">Batal</button></span>`
-        : `<button class="link" data-act="merge" data-g="${it.grp}">Gabungkan lagi ${state.items.filter(x => x.grp === it.grp).length} porsi</button>`;
-    } else if (!it.grp && it.qty > 1){
-      ctl = `<button class="link" data-act="splitQty" data-i="${i}">Pecah jadi ${it.qty} porsi</button>`;
-    }
-    return `<div class="acard ${who.length ? "" : "unset"} ${it.grp ? "part" : ""}">
-      <div class="ahead"><span class="aname">${esc(it.name || "Tanpa nama")}${it.grp ? `<span class="ptag">porsi ${it.part}/${it.of}</span>` : ""}</span>${it.grp ? "" : `<span class="aqty">×${it.qty}</span>`}<span class="aprice">${fmt(it.price)}</span></div>
+  $("#assignFlag").innerHTML = assignFlagHtml(c);
+  $("#assign").innerHTML = state.items.map((it, i) => !(it.price > 0) ? "" : isPcs(it) ? pcsCard(it, i) : rataCard(it, i)).join("") || `<p class="note">Belum ada menu.</p>`;
+  state.items.forEach((it, i) => { if (it.price > 0 && isPcs(it)) paintPcsCard(i); });
+}
+// Default: pick who shares the menu, and its price is split equally between them.
+function rataCard(it, i){
+  const who = (it.who || []).filter(w => state.people.includes(w));
+  const all = who.length === state.people.length;
+  const pills = state.people.map((p, pi) => {
+    const on = who.includes(p);
+    return `<label class="pill ${on ? "on" : ""}"><input type="checkbox" id="w-${it.id}-${pi}" data-act="who" data-i="${i}" data-pi="${pi}" ${on ? "checked" : ""}>${esc(p)}</label>`;
+  }).join("");
+  const ctl = it.qty > 1 ? `<button class="link" data-act="pcsMode" data-i="${i}">Isi jumlah per orang</button>` : "";
+  return `<div class="acard ${who.length ? "" : "unset"}">
+      <div class="ahead"><span class="aname">${esc(it.name || "Tanpa nama")}</span><span class="aqty">×${it.qty}</span><span class="aprice">${fmt(it.price)}</span></div>
       <div class="pills"><button class="pill all ${all ? "on" : ""}" data-act="all" data-i="${i}" aria-pressed="${all}">Semua</button><span class="sep" aria-hidden="true"></span>${pills}</div>
       <div class="afoot"><span>${who.length > 1 ? `Dibagi ${who.length}: <b>${fmt(it.price / who.length)}</b> per orang` : who.length ? "" : "Belum dipilih"}</span>
       ${ctl}</div>
     </div>`;
-  }).join("") || `<p class="note">Belum ada menu.</p>`;
+}
+// "Isi jumlah per orang": everyone gets a count, typed or set with − and +. The total cannot go past the qty.
+function pcsCard(it, i){
+  const rows = state.people.map((p, pi) => `<div class="crow"><span class="cn">${esc(p)}</span>
+        <span class="stepper"><button type="button" class="sb" data-act="pcsStep" data-i="${i}" data-pi="${pi}" data-d="-1" aria-label="Kurangi jumlah ${esc(p)}">−</button><input class="cv" id="c-${it.id}-${pi}" data-pcs="${i}" data-pi="${pi}" inputmode="decimal" autocomplete="off" aria-label="Jumlah ${esc(it.name || "menu")} untuk ${esc(p)}"><button type="button" class="sb" data-act="pcsStep" data-i="${i}" data-pi="${pi}" data-d="1" aria-label="Tambah jumlah ${esc(p)}">+</button></span>
+        <span class="ca"></span></div>`).join("");
+  return `<div class="acard pcard" data-i="${i}">
+      <div class="ahead"><span class="aname">${esc(it.name || "Tanpa nama")}</span><span class="aqty">×${it.qty}</span><span class="aprice">${fmt(it.price)}</span></div>
+      <div class="cnt">${rows}</div>
+      <p class="perr" role="alert"></p>
+      <div class="afoot"><span class="pstat"></span><button class="link" data-act="rataMode" data-i="${i}">Bagi rata saja</button></div>
+    </div>`;
+}
+// Refresh amounts, buttons and the "Sisa" line in place, so a count being typed keeps its focus.
+function paintPcsCard(i){
+  const it = state.items[i], card = document.querySelector(`.pcard[data-i="${i}"]`); if (!it || !card) return;
+  const s = pcsSplit(it), qty = Math.max(1, it.qty || 1), over = fCmp(s.sum, [qty, 1]) > 0, full = !over && fCmp(s.rest, [0, 1]) <= 0;
+  const rows = card.querySelectorAll(".crow");
+  s.rows.forEach(r => {
+    const row = rows[r.k]; if (!row) return;
+    const inp = row.querySelector(".cv"), amt = row.querySelector(".ca");
+    if (document.activeElement !== inp) inp.value = pcsText(r.v);
+    inp.classList.toggle("zero", !r.v[0]);
+    amt.textContent = fmt(r.amt); amt.classList.toggle("zero", !r.v[0]);
+    row.querySelector('[data-d="-1"]').disabled = !r.v[0];
+    row.querySelector('[data-d="1"]').disabled = full || over;
+  });
+  card.querySelector(".perr").textContent = uiFor().pcsErr[it.id] || "";
+  const st = card.querySelector(".pstat");
+  st.className = "pstat " + (full ? "ok" : "warn");
+  st.textContent = over ? `Terisi ${pcsText(s.sum)}, lebih dari qty ${qty}. Kurangi dulu.`
+    : full ? `✓ ${qty} dari ${qty} terbagi` : `Sisa ${pcsText(s.rest)} belum dibagi (${fmt(s.restAmt)})`;
+  card.classList.toggle("unset", !full);
 }
 
 function renderStoreNotes(){
@@ -802,7 +921,7 @@ function renderStoreNotes(){
                                     : standalone ? "Split yang pernah dibuat, tersimpan di browser ini. Buka untuk melihat atau memperbarui status bayar."
                                     : "Split yang pernah dibuat, tersimpan di browser ini. Masuk ke Claude agar riwayat tersimpan di akun.";
 }
-let pendingDel = null, pendingMerge = null;
+let pendingDel = null;
 function renderAccounts(){
   renderStoreNotes();
   const list = accounts.slice();
@@ -835,7 +954,7 @@ async function renderResult(){
   const c = calc();
   const flags = [];
   if (!state.people.length) flags.push("Belum ada peserta.");
-  if (c.unassigned.length) flags.push(`${c.unassigned.length} menu belum ada pemiliknya, jadi belum dihitung: ${c.unassigned.map(i => esc(itemName(i) || "Tanpa nama")).join(", ")}.`);
+  if (c.unassigned.length) flags.push(`${c.unassigned.length} menu belum ada pemiliknya, jadi belum dihitung: ${c.unassigned.map(i => esc(itemName(i) || "Tanpa nama") + (i.rest ? ` (sisa ${pcsText(i.rest)})` : "")).join(", ")}.`);
   if (!state.payee) flags.push("Rekening penerima belum dipilih.");
   $("#resultFlags").innerHTML = flags.map(f => `<div class="flag">${f}</div>`).join("");
   renderPaid(c);
@@ -878,7 +997,7 @@ function paint(ctx, c){
   words.forEach(w => { const t = line ? line + " " + w : w; if (ctx.measureText(t).width > IW && line){ lines.push(line); line = w; } else line = t; });
   if (line) lines.push(line); lines = lines.slice(0, 3);
   lines.forEach(l => { T(l, X1, y, `800 36px ${SANS}`, ink); y += 44; });
-  T(`${state.people.length} orang · ${new Set(state.items.filter(it => it.price > 0).map(it => it.grp || it.id)).size} menu`, X1, y, `500 19px ${SANS}`, soft);
+  T(`${state.people.length} orang · ${state.items.filter(it => it.price > 0).length} menu`, X1, y, `500 19px ${SANS}`, soft);
   y += 30; dash(y); y += 52;
 
   state.people.forEach(p => {
@@ -981,7 +1100,7 @@ let mergeMode = false, mergeSel = new Set(), mergeBills = [], mergeBlobs = [], m
 function billToState(bill){
   const isDraft = bill.draft === true;
   return Object.assign(blank(), { billId:bill.id, title: bill.title === "Tanpa nama" ? "" : (bill.title || ""), date:bill.date || new Date().toISOString(),
-    items:bill.items || [], tax:bill.tax || 0, service:bill.service || 0, discount:bill.discount || 0, scannedTotal:bill.scannedTotal || null,
+    items:migrateItems(bill.items || []), tax:bill.tax || 0, service:bill.service || 0, discount:bill.discount || 0, scannedTotal:bill.scannedTotal || null,
     people:bill.people || [], payee:bill.payee || null, payeePerson:bill.payeePerson || null, paid:bill.paid || {}, serviceMode: bill.serviceMode === "proporsional" ? "proporsional" : "rata", priceMode: bill.priceMode === "unit" ? "unit" : "total",
     draft:isDraft, step: isDraft ? Math.min(bill.step || 0, 3) : 4, createdAt:bill.createdAt || Date.now(), updatedAt:bill.updatedAt || 0 });
 }
@@ -1524,7 +1643,7 @@ document.addEventListener("click", async e => {
   else if (a === "addPerson"){ const inp = $("#personInput"); addPeopleFrom(inp.value); inp.value = ""; touch(true); renderPeople(); }
   else if (a === "delPerson"){
     const p = state.people[+b.dataset.i];
-    state.people.splice(+b.dataset.i, 1); state.items.forEach(it => it.who = (it.who || []).filter(w => w !== p)); delete state.paid[p];
+    state.people.splice(+b.dataset.i, 1); state.items.forEach(it => { it.who = (it.who || []).filter(w => w !== p); if (it.pcs) delete it.pcs[p]; }); delete state.paid[p];
     if (state.payeePerson === p) state.payeePerson = null;
     touch(true); renderPeople();
   }
@@ -1533,26 +1652,24 @@ document.addEventListener("click", async e => {
     const all = state.people.every(p => (it.who || []).includes(p));
     it.who = all ? [] : state.people.slice(); touch(true); renderAssign();
   }
-  else if (a === "splitQty"){
-    const i = +b.dataset.i, it = state.items[i];
-    const unit = Math.round(it.price / it.qty), parts = [];
-    const grp = "g" + rid();
-    for (let k = 0; k < it.qty; k++) parts.push({ id:rid(), name:it.name, qty:1, price: k === it.qty - 1 ? it.price - unit * (it.qty - 1) : unit, who:[], grp, part:k + 1, of:it.qty });
-    state.items.splice(i, 1, ...parts); touch(true); renderAssign();
+  else if (a === "pcsMode" || a === "rataMode"){
+    const it = state.items[+b.dataset.i]; if (!it) return;
+    // Both ways are kept, so switching back brings back the names, or the counts, entered before.
+    if (a === "pcsMode"){ it.mode = "pcs"; it.pcs = it.pcs || {}; } else delete it.mode;
+    delete uiFor().pcsErr[it.id];
+    touch(true); renderAssign();
   }
-  else if (a === "merge" || a === "mergeConfirm"){
-    const g = b.dataset.g;
-    const parts = state.items.filter(x => x.grp === g); if (!parts.length) return;
-    const differ = new Set(parts.map(x => (x.who || []).slice().sort().join("|"))).size > 1;
-    if (a === "merge" && differ){ pendingMerge = g; renderAssign(); return; }
-    const who = state.people.filter(p => parts.some(x => (x.who || []).includes(p)));
-    const merged = { id:rid(), name:parts[0].name, qty:parts.length, price:parts.reduce((s, x) => s + x.price, 0), who };
-    const first = state.items.indexOf(parts[0]);
-    state.items = state.items.filter(x => x.grp !== g);
-    state.items.splice(first, 0, merged);
-    pendingMerge = null; touch(true); renderAssign();
+  else if (a === "pcsStep"){
+    const i = +b.dataset.i, it = state.items[i], p = state.people[+b.dataset.pi]; if (!it || !p) return;
+    const cur = pcsOf(it, p), rest = pcsSplit(it).rest, up = +b.dataset.d > 0;
+    // + adds one, or what is left when less than one remains; − takes one away, down to 0.
+    if (up && fCmp(rest, [0, 1]) <= 0) return;
+    const next = up ? fAdd(cur, fMin([1, 1], rest)) : fSub(cur, fMin([1, 1], cur));
+    it.pcs = it.pcs || {};
+    if (next[0] > 0) it.pcs[p] = next; else delete it.pcs[p];
+    delete uiFor().pcsErr[it.id];
+    touch(true); paintPcsCard(i); $("#assignFlag").innerHTML = assignFlagHtml(calc());
   }
-  else if (a === "cancelMerge"){ pendingMerge = null; renderAssign(); }
   else if (a === "pickAcc"){
     if (e.target.closest(".del")) return;
     const id = b.dataset.id; const acc = accounts.find(x => x.id === id) || (state.payee && state.payee.id === id ? state.payee : null);
@@ -1642,13 +1759,26 @@ document.addEventListener("input", e => {
     uiFor().moneyErr.receiptTotal = r.ok || r.soft ? "" : r.msg; uiFor().held = false;
     paintMoneyErr(); renderItemsFlag(); touch(true); renderTotals();
   }
+  else if (t.dataset.pcs !== undefined){
+    const i = +t.dataset.pcs, it = state.items[i], p = state.people[+t.dataset.pi]; if (!it || !p) return;
+    const r = parsePcs(t.value), u = uiFor();
+    let msg = r.ok || r.soft ? "" : r.msg;
+    if (r.ok){
+      const room = fSub([Math.max(1, it.qty || 1), 1], fSub(pcsSum(it), pcsOf(it, p)));
+      if (fCmp(r.value, room) > 0) msg = `Melebihi qty. Untuk ${p} paling banyak ${pcsText(fCmp(room, [0, 1]) > 0 ? room : [0, 1])}.`;
+      else { it.pcs = it.pcs || {}; if (r.value[0] > 0) it.pcs[p] = r.value; else delete it.pcs[p]; touch(true); }
+    }
+    if (msg) u.pcsErr[it.id] = msg; else delete u.pcsErr[it.id];
+    t.classList.toggle("bad", !!msg);
+    paintPcsCard(i); $("#assignFlag").innerHTML = assignFlagHtml(calc());
+  }
   else if (t.dataset.f){
     const it = state.items.find(i => i.id === t.closest(".irow").dataset.id); if (!it) return;
     const er = rowErrOf(it);
     if (t.dataset.f === "name") it.name = t.value;
     if (t.dataset.f === "qty"){
       // A wrong qty is not used: the last valid one stays until the field is fixed.
-      const r = parseQty(t.value);
+      const r = qtyCheck(it, t.value);
       if (r.ok) setQty(it, r.value);
       er.qty = r.ok ? "" : r.msg;
     }
@@ -1661,15 +1791,28 @@ document.addEventListener("input", e => {
     touch(true); renderTotals(); paintRow(it); renderItemsFlag();
   }
 });
+// A count is selected on focus, so typing replaces the 0 instead of adding to it.
+document.addEventListener("focusin", e => { const t = e.target; if (t.dataset && t.dataset.pcs !== undefined) setTimeout(() => { try { t.select(); } catch(err){} }, 0); });
 document.addEventListener("focusout", e => {
   const t = e.target;
+  if (t.dataset && t.dataset.pcs !== undefined){
+    // Leaving a count: a value that was not accepted goes back to the last valid one, and the reason stays in the card.
+    const i = +t.dataset.pcs, it = state.items[i], p = state.people[+t.dataset.pi];
+    if (it && p){
+      const r = parsePcs(t.value);
+      if (!r.ok) uiFor().pcsErr[it.id] = r.msg;
+      t.value = pcsText(pcsOf(it, p)); t.classList.remove("bad");
+      paintPcsCard(i);
+    }
+    return;
+  }
   const row = t.closest && t.closest(".irow");
   // On leaving a field, a value that was not accepted goes back to the last valid one, and the reason stays under it.
   if (row && t.dataset.f){
     const it = state.items.find(i => i.id === row.dataset.id); if (!it) return;
     const u = uiFor(), er = rowErrOf(it);
     if (t.dataset.f === "qty"){
-      const r = parseQty(t.value);
+      const r = qtyCheck(it, t.value);
       if (!r.ok){ if (r.msg) u.rejectedAt = Date.now(); t.value = it.qty; }
     }
     if (t.dataset.f === "price"){
