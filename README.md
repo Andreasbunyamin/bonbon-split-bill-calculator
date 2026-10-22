@@ -11,7 +11,7 @@ Web split bill untuk makan bareng. Masukkan menu dari struk, nama yang ikut maka
 ## Fitur
 
 - **Halaman utama.** Mulai split baru, lanjutkan split yang belum selesai, atau cek siapa yang belum bayar dari satu halaman.
-- **Input menu dari struk**: nama menu, qty, dan harga, plus pajak, service charge, dan diskon.
+- **Input menu dari struk**: nama menu, qty, dan harga, plus pajak, service charge, dan diskon. Harga bisa diisi sebagai total per baris atau harga satuan (total per baris dihitung otomatis dari qty × harga). Setiap menu wajib punya nama dan harga, dan angka yang formatnya salah ditolak dengan pesan.
 - **Cek total.** Isi total yang tertera di struk, lalu aplikasi memberi tahu apakah hasil hitung sudah cocok atau masih ada selisih (misalnya menu yang terlewat).
 - **Assign menu per orang.** Satu menu bisa dimiliki satu orang, beberapa orang, atau semua (harga dibagi rata).
 - **Pecah dan gabung porsi.** Item seperti "Es Teh ×5" bisa dipecah jadi 5 porsi untuk orang yang berbeda, lalu digabung lagi kalau perlu.
@@ -69,6 +69,23 @@ python -m http.server 8000   # buka http://localhost:8000
 HTML, CSS, dan JavaScript tanpa framework, Canvas API untuk membuat gambar hasil, Web Share API untuk berbagi ke aplikasi chat, dan `localStorage` untuk penyimpanan.
 
 ## Riwayat perubahan
+
+### 1.2.2 (19 Oktober 2026)
+
+**Fitur baru**
+- Pilihan "Harga yang diisi" di langkah Struk: **Total per baris** (bawaan) atau **Harga satuan**. Di mode harga satuan, total per baris dihitung otomatis dari qty × harga.
+- Mengganti pilihan tidak mengubah angka yang sudah diketik, hanya artinya. Kalau salah pilih, semua baris terkoreksi dengan sekali tekan.
+- Baris dengan qty lebih dari 1 menampilkan hitungannya, misalnya "= Rp46.848" atau "Rp2.928/item".
+
+**Perbaikan**
+- Qty hanya menerima angka bulat 1–999. Sebelumnya "-3" terbaca 3 dan "1,5" terbaca 15.
+- Kolom harga, pajak, service, diskon, dan total di struk mengenali format struk seperti "125.000,00", "125,000", dan "Rp 25.000". Sebelumnya "125.000,00" terbaca 12.500.000.
+- Angka desimal (misalnya "12,5") dan angka minus ditolak dengan pesan. Isiannya kembali ke angka terakhir yang benar, dan alasannya tampil di bawah kolom. Khusus kolom diskon, tanda minus diabaikan.
+- Setiap menu wajib punya nama dan harga sebelum lanjut dari langkah Struk. Baris yang kosong sama sekali dihapus otomatis, dan menu Rp0 (misalnya tas plastik) tidak perlu dimasukkan.
+- Langkah Menu, hasil, gambar, dan tagihan gabungan tidak lagi menampilkan atau menghitung baris tanpa harga.
+- Jumlah menu di gambar hasil menghitung menu yang dipecah jadi porsi sebagai satu menu.
+
+**Catatan:** split lama terbuka dengan pilihan "Total per baris", jadi nominalnya tidak berubah.
 
 ### 1.2.1 (19 Oktober 2026)
 

@@ -100,15 +100,22 @@ h2{font-size:17px;font-weight:700;margin:8px 0 0}
 .x{border:0;background:none;color:var(--muted);font-size:20px;line-height:1;cursor:pointer;width:34px;height:34px;border-radius:8px}
 .x:hover{background:var(--sunk);color:var(--danger)}
 .empty-items{padding:18px;color:var(--muted);font-size:14px;text-align:center}
+.irow .inote{grid-column:1/-1;margin:-4px 0 2px;padding:0 8px;font-size:12.5px;line-height:1.45;color:var(--muted);font-family:var(--mono);font-variant-numeric:tabular-nums}
+.irow .inote.err{color:var(--danger);font-family:var(--sans)}
+.irow .inote:empty{display:none}
+.irow.bad{box-shadow:inset 3px 0 0 var(--danger)}
+.irow input.bad,.irow input.bad:focus,.inp.bad,.inp.bad:focus{border-color:var(--danger)}
+.fieldmsg{margin:0;font-size:13px;color:var(--danger)}
+.fieldmsg:empty{display:none}
 
 .extras{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
 .extras .inp{font-family:var(--mono);text-align:right}
-.svc-mode{display:flex;flex-direction:column;gap:6px}
-.svc-mode>span{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.svc-mode,.price-mode{display:flex;flex-direction:column;gap:6px}
+.svc-mode>span,.price-mode>span{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
 .seg{display:grid;grid-template-columns:1fr 1fr;gap:3px;padding:3px;background:var(--sunk);border:1px solid var(--line);border-radius:10px}
 .seg button{border:0;background:none;border-radius:8px;padding:9px 10px;font-size:14px;font-weight:600;color:var(--muted);cursor:pointer}
 .seg button[aria-checked="true"]{background:var(--surface);color:var(--ink);box-shadow:0 0 0 1px var(--line)}
-.svc-mode .note{margin:0}
+.svc-mode .note,.price-mode .note{margin:0}
 .totals{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;display:flex;flex-direction:column;gap:4px;font-size:14px}
 .trow{display:flex;justify-content:space-between;gap:12px}
 .trow span:last-child{font-family:var(--mono);font-variant-numeric:tabular-nums}
@@ -220,6 +227,7 @@ textarea.inp{min-height:140px;font-family:var(--mono);font-size:13px}
   .drop{width:96px;height:124px}
   .ihead,.irow{grid-template-columns:minmax(0,1fr) 40px 88px 30px;gap:4px;padding:6px 8px}
   .irow input{padding:7px 4px}
+  .irow .inote{padding:0 4px}
   .extras{grid-template-columns:1fr 1fr 1fr;gap:6px}
   .form .grid2{grid-template-columns:1fr}
   .steps button{font-size:11px}
@@ -260,6 +268,15 @@ textarea.inp{min-height:140px;font-family:var(--mono);font-size:13px}
       </div>
       <p class="note" id="noScan" hidden>Pembacaan foto otomatis tidak tersedia di tampilan ini. Isi menu secara manual di bawah.</p>
       <label class="field"><span>Nama tempat</span><input class="inp" id="title" placeholder="mis. Warung Bu Sri" autocomplete="off"></label>
+      <div class="price-mode" id="priceMode">
+        <span id="priceModeLabel">Harga yang diisi</span>
+        <div class="seg" role="radiogroup" aria-labelledby="priceModeLabel">
+          <button type="button" role="radio" aria-checked="true" data-act="priceMode" data-mode="total">Total per baris</button>
+          <button type="button" role="radio" aria-checked="false" data-act="priceMode" data-mode="unit">Harga satuan</button>
+        </div>
+        <p class="note" id="priceHint"></p>
+      </div>
+      <div class="flag" id="itemsFlag" role="alert" hidden></div>
       <div class="items" id="items"></div>
       <button class="link" data-act="addItem">+ Tambah menu</button>
       <div class="extras">
@@ -267,6 +284,7 @@ textarea.inp{min-height:140px;font-family:var(--mono);font-size:13px}
         <label class="field"><span>Service</span><input class="inp" id="service" inputmode="numeric" placeholder="0"></label>
         <label class="field"><span>Diskon</span><input class="inp" id="discount" inputmode="numeric" placeholder="0"></label>
       </div>
+      <p class="fieldmsg" id="extrasMsg" role="alert"></p>
       <div class="svc-mode" id="svcMode" hidden>
         <span id="svcModeLabel">Service dibagi</span>
         <div class="seg" role="radiogroup" aria-labelledby="svcModeLabel">
@@ -276,6 +294,7 @@ textarea.inp{min-height:140px;font-family:var(--mono);font-size:13px}
         <p class="note" id="svcHint"></p>
       </div>
       <label class="field"><span>Total di struk (opsional, untuk cek)</span><input class="inp" id="receiptTotal" inputmode="numeric" placeholder="mis. 196.900" style="font-family:var(--mono);text-align:right"></label>
+      <p class="fieldmsg" id="rtMsg" role="alert"></p>
       <div class="totals" id="totals"></div>
       <div class="navrow"><button class="ghost" data-act="home">Beranda</button><button class="primary" data-act="go" data-to="1">Lanjut: siapa yang makan</button></div>
     </section>
@@ -363,14 +382,57 @@ textarea.inp{min-height:140px;font-family:var(--mono);font-size:13px}
       <div class="navrow"><button class="ghost" data-act="mergeBack">Kembali</button><button class="primary" data-act="home">Selesai</button></div>
     </section>
   </main>
-  <footer class="appver">BonBon v1.2.1</footer>
+  <footer class="appver">BonBon v1.2.2</footer>
 </div>
 
 <script>
 (function(){
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const num = v => { const d = String(v ?? "").replace(/[^\d]/g, ""); return d ? Math.min(parseInt(d, 10), 999999999999) : 0; };
+const MONEY_MAX = 999999999999;
+// Qty takes whole numbers from 1 to 999 only. Anything else is turned down with a reason, never reinterpreted.
+function parseQty(v){
+  const s = String(v ?? "").trim();
+  if (!s) return { ok:false, msg:"" }; // being cleared and retyped
+  if (/^[-−]/.test(s)) return { ok:false, msg:"Qty tidak bisa minus." };
+  if (/[.,]/.test(s)) return { ok:false, msg:"Qty harus angka bulat. Untuk menu per kg, isi qty 1 dan harga totalnya." };
+  if (!/^\d+$/.test(s)) return { ok:false, msg:"Qty harus angka bulat, misalnya 2." };
+  const n = parseInt(s, 10);
+  if (n < 1) return { ok:false, msg:"Qty minimal 1." };
+  if (n > 999) return { ok:false, msg:"Qty maksimal 999." };
+  return { ok:true, value:n };
+}
+// Rupiah as receipts print it: 25000, 25.000, 25,000, 25.000,00, 25.000,- or Rp 25.000.
+// A separator followed by three digits groups thousands. One or two digits after the last separator are cents, which
+// must be zero. "soft" problems may only be unfinished typing (12.5 on the way to 12.500), so they are reported when
+// the field is left rather than while typing.
+const MONEY_LABEL = { price:"Harga", tax:"Pajak", service:"Service", discount:"Diskon", receiptTotal:"Total di struk" };
+function parseMoney(v, kind){
+  const label = MONEY_LABEL[kind] || "Angka";
+  const format = { ok:false, soft:true, msg:`Format ${label.toLowerCase()} tidak dikenali. Tulis misalnya 12.500.` };
+  let s = String(v ?? "").replace(/\s+/g, "").replace(/^rp\.?/i, "").replace(/[.,]-$/, "");
+  const neg = /^[-−]/.test(s);
+  if (neg) s = s.slice(1);
+  if (s && !/^[\d.,]+$/.test(s)) return { ok:false, msg:`${label} hanya boleh berisi angka, misalnya 12.500.` };
+  if (neg && kind !== "discount") return { ok:false, msg: kind === "price" ? "Harga tidak bisa minus. Potongan diisi di kolom Diskon." : `${label} tidak bisa minus.` };
+  s = s.replace(/[.,]$/, "");
+  if (!s) return { ok:true, value:0 };
+  const parts = s.split(/[.,]/), seps = s.match(/[.,]/g) || [];
+  let whole = parts, wholeSeps = seps;
+  const last = parts[parts.length - 1];
+  if (parts.length > 1 && last.length !== 3){
+    if (last.length > 3) return format;
+    whole = parts.slice(0, -1); wholeSeps = seps.slice(0, -1);
+    if (wholeSeps.includes(seps[seps.length - 1])) return format;
+    if (/[1-9]/.test(last)) return { ok:false, soft:true, msg:`${label} tidak bisa pakai angka desimal. Tulis lengkap, misalnya 12.500.` };
+  }
+  if (whole.length > 1 && (new Set(wholeSeps).size > 1 || !whole[0] || whole[0].length > 3 || whole.slice(1).some(p => p.length !== 3))) return format;
+  const digits = whole.join("");
+  if (!digits) return { ok:true, value:0 };
+  const n = parseInt(digits, 10);
+  if (n > MONEY_MAX) return { ok:false, msg:`${label} terlalu besar.` };
+  return { ok:true, value:n };
+}
 const fmtN = n => Math.round(n).toLocaleString("id-ID");
 const fmt = n => (n < 0 ? "-Rp" : "Rp") + fmtN(Math.abs(n));
 const rid = () => Math.random().toString(36).slice(2, 9);
@@ -379,7 +441,7 @@ const STEPS = ["Struk", "Peserta", "Menu", "Rekening", "Hasil"];
 const LS = "bonbon.v1.";
 
 /* ---------- state ---------- */
-function blank(){ return { billId:null, title:"", date:new Date().toISOString(), items:[], tax:0, service:0, discount:0, scannedTotal:null, people:[], payee:null, payeePerson:null, paid:{}, isExample:false, draft:true, step:0, createdAt:null, updatedAt:0, serviceMode:"rata" }; }
+function blank(){ return { billId:null, title:"", date:new Date().toISOString(), items:[], tax:0, service:0, discount:0, scannedTotal:null, people:[], payee:null, payeePerson:null, paid:{}, isExample:false, draft:true, step:0, createdAt:null, updatedAt:0, serviceMode:"rata", priceMode:"total" }; }
 function example(){
   const s = blank();
   s.isExample = true; s.title = "Warung Sate Pak Kumis (contoh)";
@@ -454,7 +516,7 @@ function billBody(){
   const c = calc();
   const isDraft = state.draft === true;
   return { title: String(state.title || "").trim(), date: state.date, items: state.items, tax: state.tax, service: state.service, discount: state.discount,
-    scannedTotal: state.scannedTotal ?? null, people: state.people, payee: state.payee ?? null, payeePerson: state.payeePerson ?? null, paid: state.paid, grand: Math.round(c.grand), serviceMode: svcProp() ? "proporsional" : "rata",
+    scannedTotal: state.scannedTotal ?? null, people: state.people, payee: state.payee ?? null, payeePerson: state.payeePerson ?? null, paid: state.paid, grand: Math.round(c.grand), serviceMode: svcProp() ? "proporsional" : "rata", priceMode: state.priceMode === "unit" ? "unit" : "total",
     draft: isDraft, step: isDraft ? Math.min(state.step || 0, 3) : 4,
     createdAt: state.createdAt || Date.now(), updatedAt: Date.now() };
 }
@@ -497,6 +559,7 @@ function calc(){
   const per = {}; state.people.forEach(p => per[p] = { items:[], sub:0 });
   const unassigned = []; let itemsTotal = 0;
   state.items.forEach(it => {
+    if (!(it.price > 0)) return; // a row without a price has nothing to split
     itemsTotal += it.price;
     const who = (it.who || []).filter(w => per[w]);
     if (!who.length){ unassigned.push(it); return; }
@@ -572,20 +635,110 @@ function renderSvcMode(){
     ? "Cocok untuk ongkos kirim atau biaya layanan aplikasi, misalnya GrabFood. Semua orang membayar sama."
     : "Cocok untuk service charge restoran. Yang pesan lebih banyak membayar service lebih besar, seperti pajak.";
 }
+/* ---------- menu rows: price mode, input checks, complete rows ---------- */
+// Messages belong to one split and reset by themselves when another split is opened.
+let ui = { st:null, rowErr:{}, moneyErr:{}, checked:false, held:false, rejectedAt:0 };
+function uiFor(){ if (ui.st !== state) ui = { st:state, rowErr:{}, moneyErr:{}, checked:false, held:false, rejectedAt:0 }; return ui; }
+const itemName = it => String(it.name || "").trim();
+const rowErrOf = it => { const u = uiFor(); return u.rowErr[it.id] || (u.rowErr[it.id] = {}); };
+// A row with nothing typed in it is not a problem: it is dropped when moving on. A row still showing a rejected value is kept.
+const isBlankItem = it => !itemName(it) && !(it.price > 0) && !rowErrOf(it).qty && !rowErrOf(it).price;
+function itemProblem(it){
+  const named = !!itemName(it), priced = it.price > 0;
+  if (named && priced) return "";
+  if (!named && !priced) return isBlankItem(it) ? "" : "Nama dan harga belum diisi. Lengkapi atau hapus barisnya.";
+  return named ? "Harga belum diisi. Menu gratis (Rp0) tidak perlu dimasukkan, hapus saja barisnya." : "Nama menu belum diisi.";
+}
+function itemHint(it){
+  if (!(it.qty > 1) || !(it.price > 0)) return "";
+  if (state.priceMode === "unit") return `= ${fmt(it.price)}`;
+  const u = it.price / it.qty;
+  return `${Number.isInteger(u) ? "" : "≈ "}${fmt(u)}/item`;
+}
+// The stored price is always the line total. In "Harga satuan" mode the field shows (and takes) the price of one item.
+const shownPrice = it => !(it.price > 0) ? "" : fmtN(state.priceMode === "unit" ? it.price / it.qty : it.price);
+function setQty(it, n){
+  if (n === it.qty) return;
+  if (state.priceMode === "unit" && it.price > 0) it.price = Math.min(Math.round(it.price / it.qty) * n, MONEY_MAX);
+  it.qty = n;
+}
+function paintRow(it){
+  const row = document.querySelector(`.irow[data-id="${it.id}"]`); if (!row) return;
+  const e = rowErrOf(it), errs = [e.qty, e.price].filter(Boolean);
+  // What is missing shows once "Lanjut" found it (ahead of an older note), and not on the row being typed in.
+  const prob = uiFor().checked && !row.contains(document.activeElement) ? itemProblem(it) : "";
+  const note = row.querySelector(".inote");
+  note.textContent = prob || errs.join(" ") || itemHint(it);
+  note.classList.toggle("err", !!(errs.length || prob));
+  // The outline marks what still needs fixing: a value being typed that cannot be used, or what "Lanjut" found missing.
+  const qEl = row.querySelector("[data-f=qty]"), pEl = row.querySelector("[data-f=price]"), pr = parseMoney(pEl.value, "price");
+  const qLive = !!qEl.value.trim() && !parseQty(qEl.value).ok, pLive = !pr.ok && !pr.soft;
+  row.classList.toggle("bad", !!prob || qLive || pLive);
+  const mark = (f, on) => { const el = row.querySelector(`[data-f=${f}]`); el.classList.toggle("bad", on); el.setAttribute("aria-invalid", String(on)); };
+  mark("name", !!prob && !itemName(it));
+  mark("qty", qLive);
+  mark("price", pLive || (!!prob && !(it.price > 0)));
+}
+function renderItemsFlag(){
+  const u = uiFor();
+  const n = u.checked ? state.items.filter(it => itemProblem(it)).length : 0;
+  const text = n ? `${n} menu belum lengkap. Lengkapi nama dan harganya, atau hapus barisnya.`
+    : u.held ? "Ada angka yang tidak dipakai karena formatnya salah. Cek pesan merah, lalu tekan Lanjut lagi." : "";
+  $("#itemsFlag").hidden = !text;
+  $("#itemsFlag").textContent = text;
+}
+function paintMoneyErr(){
+  const m = uiFor().moneyErr;
+  ["tax", "service", "discount", "receiptTotal"].forEach(k => {
+    const el = $("#" + k); if (!el) return;
+    const r = parseMoney(el.value, k), live = !r.ok && !r.soft;
+    el.classList.toggle("bad", live); el.setAttribute("aria-invalid", String(live));
+  });
+  $("#extrasMsg").textContent = ["tax", "service", "discount"].map(k => m[k]).filter(Boolean).join(" ");
+  if ($("#rtMsg")) $("#rtMsg").textContent = m.receiptTotal || "";
+}
+// Leaving the Struk step: empty rows are dropped, and a row with only a name or only a price has to be completed
+// or deleted first, so every menu that reaches the next steps has a name and something to split.
+function checkItems(){
+  const u = uiFor();
+  const n = state.items.length;
+  state.items = state.items.filter(it => !isBlankItem(it));
+  if (state.items.length !== n) touch(true);
+  const bad = state.items.filter(it => itemProblem(it));
+  // A value turned down on the way to this button has not been read yet: stop once so the reason can be seen.
+  const fresh = Date.now() - u.rejectedAt < 1500;
+  u.held = fresh && !bad.length; u.checked = bad.length > 0;
+  if (!bad.length && !fresh){ u.rowErr = {}; u.moneyErr = {}; return true; }
+  renderStruk();
+  const first = bad.length ? document.querySelector(`.irow[data-id="${bad[0].id}"]`) : document.querySelector("#s0 .inote.err, #s0 .fieldmsg:not(:empty)");
+  if (first) first.scrollIntoView({ block:"center" });
+  return false;
+}
+function renderPriceMode(){
+  const m = state.priceMode === "unit" ? "unit" : "total";
+  document.querySelectorAll("#priceMode [data-mode]").forEach(b => b.setAttribute("aria-checked", String(b.dataset.mode === m)));
+  $("#priceHint").textContent = m === "unit"
+    ? "Isi harga satu item. Total per baris dihitung otomatis: qty × harga."
+    : "Isi total per baris (qty × harga satuan), biasanya angka paling kanan di struk.";
+}
 function renderStruk(){
   $("#title").value = state.title;
   renderSvcMode();
   ["tax","service","discount"].forEach(k => $("#" + k).value = state[k] ? fmtN(state[k]) : "");
   $("#receiptTotal").value = state.scannedTotal ? fmtN(state.scannedTotal) : "";
+  const unit = state.priceMode === "unit";
   const rows = state.items.map(it => `
     <div class="irow" data-id="${it.id}">
-      <input id="n-${it.id}" data-f="name" value="${esc(it.name)}" placeholder="Nama menu" aria-label="Nama menu">
-      <input id="q-${it.id}" data-f="qty" class="num" inputmode="numeric" value="${it.qty}" aria-label="Jumlah">
-      <input id="p-${it.id}" data-f="price" class="num" inputmode="numeric" value="${it.price ? fmtN(it.price) : ""}" placeholder="0" aria-label="Harga total">
+      <input id="n-${it.id}" data-f="name" value="${esc(it.name)}" placeholder="Nama menu" aria-label="Nama menu" aria-describedby="m-${it.id}">
+      <input id="q-${it.id}" data-f="qty" class="num" inputmode="numeric" pattern="[0-9]*" value="${it.qty}" aria-label="Jumlah" aria-describedby="m-${it.id}">
+      <input id="p-${it.id}" data-f="price" class="num" inputmode="numeric" value="${shownPrice(it)}" placeholder="0" aria-label="${unit ? "Harga satuan" : "Harga total"}" aria-describedby="m-${it.id}">
       <button class="x" data-act="delItem" aria-label="Hapus ${esc(it.name)}">×</button>
+      <p class="inote" id="m-${it.id}"></p>
     </div>`).join("");
-  $("#items").innerHTML = `<div class="ihead"><span>Menu</span><span class="num">Qty</span><span class="num">Harga</span><span></span></div>` +
+  $("#items").innerHTML = `<div class="ihead"><span>Menu</span><span class="num">Qty</span><span class="num">${unit ? "Harga/item" : "Total"}</span><span></span></div>` +
     (rows || `<div class="empty-items">Belum ada menu. Tekan "+ Tambah menu" di bawah.</div>`);
+  state.items.forEach(paintRow);
+  renderPriceMode(); renderItemsFlag(); paintMoneyErr();
   renderTotals();
 }
 function renderTotals(){
@@ -615,6 +768,7 @@ function renderAssign(){
   const c = calc();
   $("#assignFlag").innerHTML = c.unassigned.length ? `<div class="flag">${c.unassigned.length} menu belum ada pemiliknya.</div>` : "";
   $("#assign").innerHTML = state.items.map((it, i) => {
+    if (!(it.price > 0)) return ""; // nothing to split
     const who = (it.who || []).filter(w => state.people.includes(w));
     const all = who.length === state.people.length;
     const pills = state.people.map((p, pi) => {
@@ -681,7 +835,7 @@ async function renderResult(){
   const c = calc();
   const flags = [];
   if (!state.people.length) flags.push("Belum ada peserta.");
-  if (c.unassigned.length) flags.push(`${c.unassigned.length} menu belum ada pemiliknya, jadi belum dihitung: ${c.unassigned.map(i => esc(i.name)).join(", ")}.`);
+  if (c.unassigned.length) flags.push(`${c.unassigned.length} menu belum ada pemiliknya, jadi belum dihitung: ${c.unassigned.map(i => esc(itemName(i) || "Tanpa nama")).join(", ")}.`);
   if (!state.payee) flags.push("Rekening penerima belum dipilih.");
   $("#resultFlags").innerHTML = flags.map(f => `<div class="flag">${f}</div>`).join("");
   renderPaid(c);
@@ -724,7 +878,7 @@ function paint(ctx, c){
   words.forEach(w => { const t = line ? line + " " + w : w; if (ctx.measureText(t).width > IW && line){ lines.push(line); line = w; } else line = t; });
   if (line) lines.push(line); lines = lines.slice(0, 3);
   lines.forEach(l => { T(l, X1, y, `800 36px ${SANS}`, ink); y += 44; });
-  T(`${state.people.length} orang · ${state.items.length} menu`, X1, y, `500 19px ${SANS}`, soft);
+  T(`${state.people.length} orang · ${new Set(state.items.filter(it => it.price > 0).map(it => it.grp || it.id)).size} menu`, X1, y, `500 19px ${SANS}`, soft);
   y += 30; dash(y); y += 52;
 
   state.people.forEach(p => {
@@ -828,7 +982,7 @@ function billToState(bill){
   const isDraft = bill.draft === true;
   return Object.assign(blank(), { billId:bill.id, title: bill.title === "Tanpa nama" ? "" : (bill.title || ""), date:bill.date || new Date().toISOString(),
     items:bill.items || [], tax:bill.tax || 0, service:bill.service || 0, discount:bill.discount || 0, scannedTotal:bill.scannedTotal || null,
-    people:bill.people || [], payee:bill.payee || null, payeePerson:bill.payeePerson || null, paid:bill.paid || {}, serviceMode: bill.serviceMode === "proporsional" ? "proporsional" : "rata",
+    people:bill.people || [], payee:bill.payee || null, payeePerson:bill.payeePerson || null, paid:bill.paid || {}, serviceMode: bill.serviceMode === "proporsional" ? "proporsional" : "rata", priceMode: bill.priceMode === "unit" ? "unit" : "total",
     draft:isDraft, step: isDraft ? Math.min(bill.step || 0, 3) : 4, createdAt:bill.createdAt || Date.now(), updatedAt:bill.updatedAt || 0 });
 }
 // Each split is first calculated on its own (same rules as its own result), then amounts are summed per person (by name,
@@ -1224,11 +1378,14 @@ async function scan(){
   try {
     const blob = await shrink(scanFile);
     const r = sample ? await sample.json(PROMPT, { images:[blob], modelTier:"default" }) : await scanViaServer(blob);
-    const items = (r && Array.isArray(r.items) ? r.items : []).filter(x => x && x.name).map(x => ({
-      id:rid(), name:String(x.name).slice(0, 80), qty:Math.max(1, Math.round(+x.qty || 1)), price:Math.max(0, Math.round(+x.price || 0)), who:[] }));
+    const read = (r && Array.isArray(r.items) ? r.items : []).filter(x => x && typeof x === "object").map(x => ({
+      id:rid(), name:String(x.name ?? "").trim().slice(0, 80), qty:Math.min(999, Math.max(1, Math.round(+x.qty || 1))), price:Math.max(0, Math.round(+x.price || 0)), who:[] }));
+    // Free lines (a plastic bag, Rp0 add-ons) have nothing to split, so they are left out. A priced line without a name
+    // stays, so its money is not lost: the Struk step asks for the name before moving on.
+    const items = read.filter(x => x.price > 0), free = read.filter(x => !x.price && x.name), noName = items.filter(x => !x.name).length;
     if (!items.length) throw { code:"no_items" };
     if (state.isExample){ state = blank(); }
-    state.items = items;
+    state.items = items; state.priceMode = "total"; uiFor().moneyErr = {};
     state.tax = Math.max(0, Math.round(+r.tax || 0)); state.service = Math.max(0, Math.round(+r.service || 0)); state.discount = Math.max(0, Math.round(+r.discount || 0));
     state.scannedTotal = r.total ? Math.round(+r.total) : null;
     if (r.merchant && !state.title) state.title = String(r.merchant).slice(0, 80);
@@ -1236,7 +1393,7 @@ async function scan(){
     if (state.draft !== true){ state.billId = null; state.createdAt = null; state.draft = true; state.paid = {}; lastSavedJSON = null; }
     touch(true);
     renderStruk();
-    st.className = "status ok"; st.textContent = `${items.length} menu terbaca. Periksa nama dan harga di bawah.`;
+    st.className = "status ok"; st.textContent = `${items.length} menu terbaca.${free.length ? ` Menu Rp0 tidak dimasukkan: ${free.map(x => x.name).join(", ")}.` : ""}${noName ? ` ${noName} menu belum ada namanya.` : ""} Periksa nama dan harga di bawah.`;
   } catch(e){
     const code = e && e.code;
     const msg = {
@@ -1262,7 +1419,7 @@ function manualOnly(){
   disableScan();
   $("#noScan").hidden = true;
   $("#s0 h1").textContent = "Isi menu dari struk";
-  $("#s0 .lede").textContent = "Ketik nama menu, jumlah, dan harga total per baris sesuai struk. Isi total di struk untuk mengecek apakah semua menu sudah masuk.";
+  $("#s0 .lede").textContent = "Ketik nama menu, jumlah, dan harganya sesuai struk. Isi total di struk untuk mengecek apakah semua menu sudah masuk.";
   $("#exampleBanner").innerHTML = 'Ini contoh isian. Ubah langsung, atau <button data-act="reset">mulai dari kosong</button>';
 }
 function disableScan(){ sample = null; serverScan = false; $("#uploadBox").hidden = true; $("#noScan").hidden = false; }
@@ -1313,13 +1470,26 @@ document.addEventListener("click", async e => {
   const b = e.target.closest("[data-act]"); if (!b) return;
   const a = b.dataset.act;
   if (a === "who" || a === "paid" || a === "mergePick") return; // handled on change
-  if (a === "go"){ step = +b.dataset.to; view = "steps"; show(); }
+  if (a === "go"){
+    const to = +b.dataset.to;
+    if (view === "steps" && step === 0 && to > 0 && !checkItems()) return;
+    step = to; view = "steps"; show();
+  }
   else if (a === "home"){ flushSave(); view = "home"; histDel = null; mergeMode = false; mergeSel.clear(); show(); }
   else if (a === "history"){ flushSave(); view = "history"; histDel = null; mergeMode = false; mergeSel.clear(); show(); }
   else if (a === "reset"){ state = blank(); scanFile = null; lastSavedJSON = null; dirty = false; resetUpload(); touch(false); show(); }
   else if (a === "newBill"){ flushSave(); state = blank(); scanFile = null; lastSavedJSON = null; dirty = false; resetUpload(); touch(false); step = 0; view = "steps"; show(); }
   else if (a === "example"){ flushSave(); state = example(); scanFile = null; lastSavedJSON = null; dirty = false; resetUpload(); touch(false); step = 0; view = "steps"; show(); }
   else if (a === "cancelDel"){ histDel = null; rerenderList(); }
+  else if (a === "priceMode"){
+    const m = b.dataset.mode === "unit" ? "unit" : "total";
+    if ((state.priceMode === "unit" ? "unit" : "total") !== m){
+      // The typed numbers stay as they are and only their meaning changes, so a wrong choice is fixed for every row at once.
+      state.items.forEach(it => { if (it.qty > 1 && it.price > 0) it.price = m === "unit" ? Math.min(it.price * it.qty, MONEY_MAX) : Math.round(it.price / it.qty); });
+      state.priceMode = m; touch(true);
+    }
+    renderStruk();
+  }
   else if (a === "svcMode"){ if (state.serviceMode !== b.dataset.mode){ state.serviceMode = b.dataset.mode; touch(true); } renderSvcMode(); renderTotals(); }
   else if (a === "mergeStart"){ mergeMode = true; mergeSel.clear(); histDel = null; renderHistory(true); window.scrollTo({ top:0 }); }
   else if (a === "mergeCancel"){ mergeMode = false; mergeSel.clear(); renderHistory(true); }
@@ -1459,21 +1629,63 @@ document.addEventListener("change", e => {
 document.addEventListener("input", e => {
   const t = e.target;
   if (t.id === "title"){ state.title = t.value; touch(true); }
-  else if (["tax","service","discount"].includes(t.id)){ state[t.id] = num(t.value); touch(true); renderTotals(); if (t.id === "service") renderSvcMode(); }
+  else if (["tax","service","discount"].includes(t.id)){
+    const r = parseMoney(t.value, t.id);
+    if (r.ok) state[t.id] = r.value;
+    uiFor().moneyErr[t.id] = r.ok || r.soft ? "" : r.msg; uiFor().held = false;
+    paintMoneyErr(); renderItemsFlag(); touch(true); renderTotals(); if (t.id === "service") renderSvcMode();
+  }
   else if (t.id === "mergeTitle"){ clearTimeout(mergeT); mergeT = setTimeout(renderMerge, 400); }
-  else if (t.id === "receiptTotal"){ state.scannedTotal = num(t.value) || null; touch(true); renderTotals(); }
+  else if (t.id === "receiptTotal"){
+    const r = parseMoney(t.value, "receiptTotal");
+    if (r.ok) state.scannedTotal = r.value || null;
+    uiFor().moneyErr.receiptTotal = r.ok || r.soft ? "" : r.msg; uiFor().held = false;
+    paintMoneyErr(); renderItemsFlag(); touch(true); renderTotals();
+  }
   else if (t.dataset.f){
     const it = state.items.find(i => i.id === t.closest(".irow").dataset.id); if (!it) return;
+    const er = rowErrOf(it);
     if (t.dataset.f === "name") it.name = t.value;
-    if (t.dataset.f === "qty") it.qty = Math.max(1, num(t.value) || 1);
-    if (t.dataset.f === "price") it.price = num(t.value);
-    touch(true); renderTotals();
+    if (t.dataset.f === "qty"){
+      // A wrong qty is not used: the last valid one stays until the field is fixed.
+      const r = parseQty(t.value);
+      if (r.ok) setQty(it, r.value);
+      er.qty = r.ok ? "" : r.msg;
+    }
+    if (t.dataset.f === "price"){
+      const r = parseMoney(t.value, "price");
+      if (r.ok) it.price = Math.min(state.priceMode === "unit" ? r.value * it.qty : r.value, MONEY_MAX);
+      er.price = r.ok || r.soft ? "" : r.msg;
+    }
+    uiFor().held = false;
+    touch(true); renderTotals(); paintRow(it); renderItemsFlag();
   }
 });
 document.addEventListener("focusout", e => {
   const t = e.target;
-  if (t.dataset && t.dataset.f === "price"){ const v = num(t.value); t.value = v ? fmtN(v) : ""; }
-  if (["tax","service","discount","receiptTotal"].includes(t.id)){ const v = num(t.value); t.value = v ? fmtN(v) : ""; }
+  const row = t.closest && t.closest(".irow");
+  // On leaving a field, a value that was not accepted goes back to the last valid one, and the reason stays under it.
+  if (row && t.dataset.f){
+    const it = state.items.find(i => i.id === row.dataset.id); if (!it) return;
+    const u = uiFor(), er = rowErrOf(it);
+    if (t.dataset.f === "qty"){
+      const r = parseQty(t.value);
+      if (!r.ok){ if (r.msg) u.rejectedAt = Date.now(); t.value = it.qty; }
+    }
+    if (t.dataset.f === "price"){
+      const r = parseMoney(t.value, "price");
+      if (!r.ok){ er.price = r.msg; u.rejectedAt = Date.now(); }
+      t.value = shownPrice(it);
+    }
+    setTimeout(() => { paintRow(it); renderItemsFlag(); }, 0);
+  }
+  if (["tax","service","discount","receiptTotal"].includes(t.id)){
+    const r = parseMoney(t.value, t.id), u = uiFor();
+    if (!r.ok){ u.moneyErr[t.id] = r.msg; u.rejectedAt = Date.now(); }
+    const v = t.id === "receiptTotal" ? state.scannedTotal : state[t.id];
+    t.value = v ? fmtN(v) : "";
+    paintMoneyErr();
+  }
 });
 $("#accForm").addEventListener("submit", e => {
   e.preventDefault();
