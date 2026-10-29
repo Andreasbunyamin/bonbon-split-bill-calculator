@@ -395,7 +395,7 @@ textarea.inp{min-height:140px;font-family:var(--mono);font-size:13px}
       <div class="navrow"><button class="ghost" data-act="mergeBack">Kembali</button><button class="primary" data-act="home">Selesai</button></div>
     </section>
   </main>
-  <footer class="appver">BonBon v1.3.1</footer>
+  <footer class="appver">BonBon v1.3.2</footer>
 </div>
 
 <script>
@@ -1362,8 +1362,11 @@ function reminderText(){
   const c = calc();
   const due = state.people.filter(p => !isPayee(p) && !state.paid[p]);
   if (!due.length) return null;
-  return `Halo! Pengingat patungan *${state.title || "makan bareng"}* yang belum dibayar:\n` +
-    due.map(p => `- ${p}: ${fmt(c.per[p].total)}`).join("\n") + (state.payee ? `\n\n${payeeLine()}` : "") + "\nTerima kasih!";
+  // The account number sits on a line of its own, so it can be long-pressed and copied in WhatsApp without other words.
+  const pay = state.payee ? [state.payee.bank, state.payee.owner ? `a.n. ${state.payee.owner}` : ""].filter(Boolean).join(" ") : "";
+  return `Reminder patungan *${state.title || "makan bareng"}*\n` +
+    due.map(p => `- ${p}: ${fmt(c.per[p].total)}`).join("\n") +
+    (state.payee ? `\n\nTransfer ke:\n${pay}\n${state.payee.number}` : "");
 }
 function copy(text, okMsg, st = $("#copyStatus"), ta = $("#copyFallback")){
   const fallback = () => { ta.hidden = false; ta.value = text; ta.focus(); ta.select(); st.className = "status"; st.textContent = "Salin teks di bawah ini secara manual."; };

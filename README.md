@@ -71,6 +71,22 @@ HTML, CSS, dan JavaScript tanpa framework, Canvas API untuk membuat gambar hasil
 
 ## Riwayat perubahan
 
+### 1.3.2 (29 Oktober 2026)
+
+**Tampilan**
+- Format pesan tagihan untuk yang belum bayar dibuat lebih ringkas: diawali "Reminder patungan", tanpa "Halo!" dan "Terima kasih!".
+- Nomor rekening sekarang ada di baris sendiri, di bawah nama bank dan nama pemilik, jadi bisa ditekan lama dan disalin langsung di WhatsApp.
+
+```
+Reminder patungan *Ayam Bawang Putih*
+- Andreas: Rp20.000
+- David: Rp20.000
+
+Transfer ke:
+BCA a.n. Marshelly Theresia
+4790163279
+```
+
 ### 1.3.1 (22 Oktober 2026)
 
 **Perbaikan**
